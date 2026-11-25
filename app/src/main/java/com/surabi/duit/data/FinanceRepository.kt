@@ -38,14 +38,6 @@ class FinanceRepository(private val database: FinanceDatabase) {
             "Filter jenis transaksi tidak valid."
         }
         require(startAt <= endAt) { "Rentang tanggal transaksi tidak valid." }
-        require(accountId == null || dao.getAccount(accountId, workspaceId) != null) {
-            "Akun filter tidak ditemukan pada workspace ini."
-        }
-        if (categoryId != null) {
-            require(dao.getCategoryKind(categoryId, workspaceId) != null) {
-                "Kategori filter tidak ditemukan pada workspace ini."
-            }
-        }
         require(minAmount == null || minAmount >= 0L) { "Nominal minimum tidak boleh negatif." }
         require(maxAmount == null || maxAmount >= 0L) { "Nominal maksimum tidak boleh negatif." }
         require(minAmount == null || maxAmount == null || minAmount <= maxAmount) {
