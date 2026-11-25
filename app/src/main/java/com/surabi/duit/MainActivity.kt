@@ -1291,12 +1291,18 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
     }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp, vertical = 17.dp),
+        verticalArrangement = Arrangement.spacedBy(15.dp)
     ) {
         DuitPageHeader(
             title = "Pusat bantuan",
-            subtitle = "Panduan cepat, istilah, dan pemecahan masalah Duit"
+            subtitle = "Belajar mengelola uang dengan alur yang jelas"
+        )
+        DuitFeatureBanner(
+            kicker = "DUIT HELP CENTER",
+            value = "Temukan cara menggunakan setiap fitur",
+            supporting = "Panduan, istilah, dan jawaban berdasarkan kemampuan aplikasi saat ini"
         )
         OutlinedTextField(
             value = query,
@@ -1324,14 +1330,26 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
             filtered.groupBy { it.category }.forEach { (category, topics) ->
                 DuitSectionHeader(category, "${topics.size} topik bantuan")
                 topics.forEach { entry ->
-                    DuitPanel {
-                        Text(entry.title, fontWeight = FontWeight.SemiBold)
-                        Text(entry.body, style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedButton(
-                            onClick = { onNavigate(entry.destination) },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(entry.action) }
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(Color.White)
+                            .padding(15.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.size(42.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(13.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        }
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(entry.title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text(entry.body, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { onNavigate(entry.destination) }) {
+                            Text("Buka", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
