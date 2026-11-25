@@ -52,7 +52,7 @@ Catatan cakupan: daftar transaksi masih dibatasi 500 hasil oleh query saat ini. 
 
 ### Anggaran dan target tabungan
 - Anggaran bulanan umum atau berdasarkan kategori pengeluaran.
-- Target tabungan dengan nominal tujuan dan prioritas.
+- Target tabungan dengan nominal tujuan, prioritas, dan tanggal target opsional yang dapat ditentukan saat pembuatan.
 - Setoran target mengurangi saldo akun yang dipilih; penarikan mengembalikan saldo akun.
 - Dana target dihitung dari transaksi setoran/penarikan yang terkait, bukan saldo manual yang dapat tidak sinkron.
 
