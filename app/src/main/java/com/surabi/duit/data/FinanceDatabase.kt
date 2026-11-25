@@ -248,13 +248,13 @@ data class LiabilityEntity(
     indices = [Index(value = ["workspaceId", "createdAt"]), Index("entityId")]
 )
 data class AuditLogEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val workspaceId: Long,
     val entityType: String,
     val entityId: Long,
     val action: String,
     val description: String,
-    val createdAt: Long
+    val createdAt: Long,
+    @PrimaryKey(autoGenerate = true) val id: Long = 0
 )
 
 data class GoalOverviewRow(
