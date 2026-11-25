@@ -182,32 +182,32 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             navigation.forEachIndexed { index, item ->
-                val selected = selectedIndex == index
+                val isCurrent = selectedIndex == index
                 Column(
                     modifier = Modifier.weight(1f)
                         .clip(RoundedCornerShape(15.dp))
                         .clickable { onSelect(index) }
                         .semantics(mergeDescendants = true) {
                             role = Role.Tab
-                            selected = selected
+                            this.selected = isCurrent
                         }
                         .padding(horizontal = 2.dp, vertical = 3.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(Modifier.width(28.dp).height(3.dp)
-                        .background(if (selected) DuitGreen else Color.Transparent, CircleShape))
+                        .background(if (isCurrent) DuitGreen else Color.Transparent, CircleShape))
                     Box(
                         Modifier.size(width = 45.dp, height = 29.dp)
-                            .background(if (selected) Color(0xFFDFF4E8) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            .background(if (isCurrent) Color(0xFFDFF4E8) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(item.second, contentDescription = item.first,
-                            tint = if (selected) DuitGreen else Color(0xFF819087), modifier = Modifier.size(20.dp))
+                            tint = if (isCurrent) DuitGreen else Color(0xFF819087), modifier = Modifier.size(20.dp))
                     }
                     Text(item.first, style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) DuitGreen else Color(0xFF78877F),
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                        color = if (isCurrent) DuitGreen else Color(0xFF78877F),
+                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }
@@ -680,8 +680,7 @@ internal fun DuitTransactionTile(
 @Composable
 private fun duitMoney(value: Long): String {
     if (!LocalDuitBalancesVisible.current) return "••••••"
-    return
-    NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+    return NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
         maximumFractionDigits = 0
         minimumFractionDigits = 0
     }.format(value)
