@@ -1,6 +1,6 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.2.0**. Repositori dimulai dari kondisi kosong dan dikembangkan sebagai aplikasi Android lokal/offline.
+Versi source saat ini: **0.3.0**. Repositori dimulai dari kondisi kosong dan dikembangkan sebagai aplikasi Android lokal/offline.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -23,8 +23,12 @@ Versi source saat ini: **0.2.0**. Repositori dimulai dari kondisi kosong dan dik
 - Setoran target mengurangi saldo akun yang dipilih; penarikan target menambahnya kembali.
 - Nilai target tersimpan berdasarkan transaksi setoran/penarikan, tidak disimpan sebagai angka yang dapat menyimpang dari histori.
 
-### Aset dan kewajiban
+### Aset, piutang, dan kewajiban
 - Pencatatan aset non-tunai, kategori aset, harga perolehan, dan nilai terkini.
+- Pencatatan piutang/tagihan per workspace beserta pihak yang berutang, nominal awal, jatuh tempo opsional, dan catatan.
+- Penerimaan piutang sebagian atau penuh ke akun yang dipilih; validasi mencegah penerimaan melebihi sisa piutang.
+- Sisa piutang dihitung dari seluruh penerimaan yang belum dibatalkan; pembatalan penerimaan memulihkan saldo akun dan sisa tagihan.
+- Piutang yang belum tertagih ikut menambah estimasi kekayaan bersih, sedangkan pencatatan piutang tidak menambah saldo tunai/rekening.
 - Pembaruan nilai aset dengan catatan perubahan pada audit log.
 - Pencatatan utang dengan pemberi pinjaman, nominal awal, tanggal jatuh tempo opsional, dan catatan.
 - Pencairan pinjaman dapat dikreditkan ke satu akun saat utang dibuat; gunakan hanya bila saldo pencairan belum pernah dicatat.
@@ -33,12 +37,12 @@ Versi source saat ini: **0.2.0**. Repositori dimulai dari kondisi kosong dan dik
 
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
-- Migrasi database versi 1 ke versi 2; tidak memakai destructive migration.
+- Migrasi database versi 1 ke versi 2 dan versi 2 ke versi 3; tidak memakai destructive migration.
 - Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
 - CI menjalankan unit test dan build APK Release.
 
-## Aturan akuntansi penting pada versi 0.2.0
+## Aturan akuntansi penting pada versi 0.3.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
@@ -46,15 +50,18 @@ Versi source saat ini: **0.2.0**. Repositori dimulai dari kondisi kosong dan dik
 5. Pencairan pinjaman menambah akun dan kewajiban; bukan pendapatan.
 6. Nilai aset non-tunai tidak boleh mencakup rekening/dompet yang sudah dicatat pada akun. Hal ini mencegah penghitungan ganda.
 7. Untuk pinjaman yang saldonya sudah tercatat, jangan memilih akun penerima saat membuat data utang.
+8. Mencatat piutang/tagihan tidak otomatis menambah saldo akun; hanya penerimaan yang benar-benar diterima yang menambah akun.
+9. Penerimaan piutang mengurangi sisa piutang, bukan pendapatan baru di laporan kas; pendapatan penjualan awal belum dibuat otomatis oleh modul piutang dasar.
 
 ## Belum tersedia — jangan dianggap aktif
 - Transfer transaksi lintas workspace dengan prosedur kontrol dan konsolidasi multi-workspace.
+- Edit/hapus piutang, pembagian satu piutang ke beberapa invoice, riwayat perubahan rinci, dan pengingat jatuh tempo piutang.
 - Edit transaksi umum, riwayat versi detail, dan reversal jurnal double-entry.
 - Rekonsiliasi rekening dan penyesuaian saldo formal.
 - Lampiran struk/dokumen, transaksi berulang/terjadwal/massal, template, impor dan ekspor.
 - Target dengan jadwal kontribusi otomatis dan notifikasi pengingat.
 - Penyusutan, jadwal pemeliharaan, penjualan/penghapusan aset melalui jurnal.
-- Piutang, penerimaan piutang, bunga/denda terstruktur, jadwal cicilan otomatis.
+- Integrasi piutang dengan invoice/penjualan kredit dan jurnal pendapatan; analisis umur piutang, bunga/denda terstruktur, jadwal cicilan otomatis, serta laporan penagihan lanjutan.
 - Chart of Accounts, jurnal double-entry, buku besar, neraca saldo, neraca, laba rugi, dan laporan perubahan ekuitas.
 - ERP: perusahaan/cabang/departemen/cost center/proyek terstruktur; penjualan, pembelian, invoice, pelanggan, pemasok, produk, persediaan, gudang, dan HPP.
 - Investasi dengan harga pasar otomatis, dividen, obligasi, dan portofolio.
