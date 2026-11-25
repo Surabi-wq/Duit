@@ -403,6 +403,9 @@ interface FinanceDao {
     @Query("SELECT * FROM assets WHERE workspaceId = :workspaceId ORDER BY updatedAt DESC, id DESC")
     fun observeAssets(workspaceId: Long): Flow<List<AssetEntity>>
 
+    @Query("UPDATE assets SET currentValueMinor = :currentValue, updatedAt = :updatedAt WHERE id = :assetId AND workspaceId = :workspaceId")
+    suspend fun updateAssetValue(assetId: Long, workspaceId: Long, currentValue: Long, updatedAt: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertLiability(liability: LiabilityEntity): Long
 
