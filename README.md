@@ -2,11 +2,11 @@
 
 Duit adalah aplikasi Android native untuk mengelola keuangan secara lokal dan offline. Identitas visual awal menggunakan palet hijau, putih, dan biru.
 
-## Status pengembangan
+## Status pengembangan — versi 0.2.0
 
 Repositori ini sebelumnya kosong. Proyek sedang dibangun dari dasar dan dikembangkan bertahap. Versi awal memprioritaskan fondasi data yang benar sebelum modul ERP yang lebih kompleks.
 
-### Fungsi fondasi awal
+### Fungsi yang tersedia pada 0.2.0
 - Dashboard per workspace dengan ringkasan saldo, pemasukan, dan pengeluaran periode berjalan.
 - Workspace terpisah untuk ruang keuangan yang berbeda.
 - Banyak akun/dompet di dalam workspace.
@@ -16,7 +16,7 @@ Repositori ini sebelumnya kosong. Proyek sedang dibangun dari dasar dan dikemban
 - Anggaran bulanan dan pemantauan realisasi.
 - Penyimpanan lokal menggunakan Room di atas SQLite.
 - Validasi jumlah transaksi dan kepemilikan akun terhadap workspace.
-- Build varian Release untuk pengujian distribusi APK.
+- Pencarian/filter transaksi terbaru serta pembatalan dengan alasan dan audit log.\n- Target tabungan, aset non-tunai, utang, pembayaran pokok, dan estimasi kekayaan bersih.\n- Migrasi Room v1→v2 tanpa destructive migration.\n- Build varian Release untuk pengujian distribusi APK.
 
 ### Belum dinyatakan selesai
 Modul aset, utang-piutang, investasi, pajak, akuntansi double-entry, ERP, gudang, OCR, analisis prediktif, multi-user, persetujuan berjenjang, enkripsi backup, dan impor/ekspor dokumen merupakan tahapan lanjutan. Modul-modul tersebut tidak boleh dianggap aktif sebelum memiliki alur data, validasi, antarmuka, dan pengujian.
@@ -33,7 +33,7 @@ Gunakan Android Studio yang mendukung Android Gradle Plugin pada proyek ini, JDK
 
 Perintah build: gradle :app:assembleDebug atau gradle :app:assembleRelease.
 
-APK CI dibuat dari varian Release dan diberi nama Duit-0.1.0.apk. Sertifikat debug bawaan Gradle hanya untuk pengujian internal; sebelum distribusi komersial, buat signing key pribadi dan ganti konfigurasi signing release. Jangan membagikan keystore atau password ke repositori.
+APK CI dibuat dari varian Release dan diberi nama Duit-0.2.0.apk. Sertifikat debug bawaan Gradle hanya untuk pengujian internal; sebelum distribusi komersial, buat signing key pribadi dan ganti konfigurasi signing release. Jangan membagikan keystore atau password ke repositori.
 
 ## Prinsip data
 - Tidak ada saldo/transaksi keuangan contoh yang dimasukkan sebagai data pengguna.
