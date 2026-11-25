@@ -2,7 +2,9 @@ package com.surabi.duit
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -73,6 +75,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.surabi.duit.data.AccountBalanceRow
 import com.surabi.duit.data.AssetEntity
@@ -86,9 +89,12 @@ import com.surabi.duit.data.GoalOverviewRow
 import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
+import com.surabi.duit.data.TransactionCsvExporter
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -128,6 +134,28 @@ private enum class AppTab(
 private fun DuitApp(repository: FinanceRepository) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var pendingCsv by remember { mutableStateOf<String?>(null) }
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        val csv = pendingCsv
+        pendingCsv = null
+        if (uri != null && csv != null) {
+            scope.launch {
+                val writeResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val output = context.contentResolver.openOutputStream(uri)
+                            ?: error("Lokasi penyimpanan tidak dapat dibuka.")
+                        output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                    }
+                }
+                writeResult
+                    .onSuccess { snackbar.showSnackbar("Ekspor CSV berhasil disimpan.") }
+                    .onFailure { snackbar.showSnackbar(it.message ?: "Ekspor CSV gagal disimpan.") }
+            }
+        }
+    }
     val workspaces by repository.workspaces.collectAsState(initial = emptyList())
     var selectedWorkspaceId by remember { mutableLongStateOf(0L) }
     var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
@@ -235,10 +263,20 @@ private fun DuitApp(repository: FinanceRepository) {
                     onAddTransaction = { showTransactionDialog = true }
                 )
                 AppTab.TRANSACTIONS -> TransactionsScreen(
-                    transactions = transactions,
+                    workspaceId = workspaceId,
+                    repository = repository,
                     accounts = accounts,
                     categories = categories,
                     onAdd = { showTransactionDialog = true },
+                    onExport = { rows ->
+                        pendingCsv = TransactionCsvExporter.toCsv(
+                            transactions = rows,
+                            accountNames = accounts.associate { it.id to it.name },
+                            categoryNames = categories.associate { it.id to it.name }
+                        )
+                        val fileStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+                        csvExportLauncher.launch("Duit-Transaksi-$fileStamp.csv")
+                    },
                     onVoid = { id, reason ->
                         scope.launch {
                             runCatching { repository.voidTransaction(workspaceId, id, reason) }
@@ -703,10 +741,12 @@ private fun CashflowBar(income: Long, expenses: Long) {
 
 @Composable
 private fun TransactionsScreen(
-    transactions: List<TransactionEntity>,
+    workspaceId: Long,
+    repository: FinanceRepository,
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
     onAdd: () -> Unit,
+    onExport: (List<TransactionEntity>) -> Unit,
     onVoid: (Long, String) -> Unit
 ) {
     val accountNames = accounts.associate { it.id to it.name }
@@ -715,27 +755,29 @@ private fun TransactionsScreen(
     var typeFilter by remember { mutableStateOf("ALL") }
     var selectedToVoid by remember { mutableStateOf<TransactionEntity?>(null) }
     var voidReason by remember { mutableStateOf("") }
-    val visible = transactions.filter { item ->
-        val textMatches = searchQuery.isBlank() ||
-            item.title.contains(searchQuery, ignoreCase = true) ||
-            item.note.contains(searchQuery, ignoreCase = true) ||
-            (categoryNames[item.categoryId]?.contains(searchQuery, ignoreCase = true) == true)
-        val typeMatches = when (typeFilter) {
-            "ALL" -> true
-            "OTHER" -> item.type !in setOf("INCOME", "EXPENSE", "TRANSFER")
-            else -> item.type == typeFilter
-        }
-        textMatches && typeMatches
-    }
+    val visible by remember(workspaceId, searchQuery, typeFilter) {
+        repository.searchTransactions(
+            workspaceId = workspaceId,
+            query = searchQuery,
+            type = typeFilter,
+            startAt = 0L,
+            endAt = Long.MAX_VALUE
+        )
+    }.collectAsState(initial = emptyList())
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Semua transaksi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Pencarian pada 200 transaksi terbaru di workspace ini",
+                Text("${visible.size} hasil • pencarian database, maksimal 500 transaksi terbaru",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(onClick = onAdd) {
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { onExport(visible) }, enabled = visible.isNotEmpty(), modifier = Modifier.weight(1f)) {
+                Text("Ekspor CSV")
+            }
+            Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
                 Text("Tambah")
@@ -970,8 +1012,9 @@ private fun GuideScreen() {
         GuideCard("2. Tambahkan akun", "Buat dompet tunai, rekening bank, tabungan, atau e-wallet. Saldo awal menjadi titik awal perhitungan saldo.")
         GuideCard("3. Catat transaksi", "Pilih pemasukan, pengeluaran, atau transfer. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.")
         GuideCard("4. Pantau anggaran", "Buat batas pengeluaran bulanan. Realisasi anggaran dihitung dari transaksi pengeluaran yang tersimpan.")
-        GuideCard("Penyimpanan dan privasi", "Data fondasi awal disimpan pada database lokal perangkat. Aplikasi tidak meminta izin internet. Backup dan restore mandiri belum tersedia di versi awal ini.")
-        GuideCard("Batas versi 0.1.0", "Aset, utang-piutang, akuntansi double-entry, ERP, pajak, investasi, OCR, laporan profesional, dan backup terenkripsi masih menjadi tahap pengembangan berikutnya.")
+        GuideCard("Pencarian dan ekspor", "Halaman Transaksi mencari langsung di database berdasarkan keterangan, catatan, kategori, dan jenis transaksi. Hasil yang ditemukan dapat diekspor ke CSV melalui penyimpanan perangkat; ekspor mengikuti hasil pencarian dan dibatasi maksimal 500 transaksi terbaru.")
+        GuideCard("Penyimpanan dan privasi", "Data inti disimpan lokal pada perangkat menggunakan Room/SQLite. Alur utama tidak memerlukan internet. Backup dan restore mandiri terenkripsi belum tersedia, sehingga pengguna perlu menjaga data perangkat dan tidak menganggap ekspor CSV sebagai cadangan penuh database.")
+        GuideCard("Fitur tahap berikutnya", "Jurnal akuntansi double-entry, rekonsiliasi, transaksi berulang, lampiran struk, impor file, ekspor PDF/Excel/DOCX, ERP, persediaan, investasi lengkap, pajak, OCR, analisis prediktif, multi-pengguna, enkripsi database, dan backup/restore masih dalam pengembangan.")
     }
 }
 
