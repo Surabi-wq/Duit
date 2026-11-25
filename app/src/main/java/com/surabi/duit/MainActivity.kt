@@ -1,6 +1,7 @@
 package com.surabi.duit
 
 import android.os.Bundle
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -117,6 +118,7 @@ import com.surabi.duit.data.TransactionDateRange
 import com.surabi.duit.data.TransactionCsvExporter
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
+import com.surabi.duit.ui.LocalDuitBalancesVisible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
@@ -137,9 +139,22 @@ class MainActivity : ComponentActivity() {
         window.decorView.systemUiVisibility =
             window.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         val repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
+        val displayPreferences = getSharedPreferences("duit-display-preferences", MODE_PRIVATE)
         setContent {
+            var balancesVisible by remember {
+                mutableStateOf(displayPreferences.getBoolean("balances_visible", true))
+            }
             DuitTheme {
-                DuitApp(repository)
+                CompositionLocalProvider(LocalDuitBalancesVisible provides balancesVisible) {
+                    DuitApp(
+                        repository = repository,
+                        balancesVisible = balancesVisible,
+                        onBalancesVisibleChange = { visible ->
+                            balancesVisible = visible
+                            displayPreferences.edit().putBoolean("balances_visible", visible).apply()
+                        }
+                    )
+                }
             }
         }
     }
@@ -158,7 +173,11 @@ private enum class AppTab(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DuitApp(repository: FinanceRepository) {
+private fun DuitApp(
+    repository: FinanceRepository,
+    balancesVisible: Boolean,
+    onBalancesVisibleChange: (Boolean) -> Unit
+) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -256,7 +275,9 @@ private fun DuitApp(repository: FinanceRepository) {
                 workspaces = workspaces,
                 selectedId = workspaceId,
                 onWorkspaceSelected = { selectedWorkspaceId = it },
-                onAddWorkspace = { showWorkspaceDialog = true }
+                onAddWorkspace = { showWorkspaceDialog = true },
+                balancesVisible = balancesVisible,
+                onToggleBalances = { onBalancesVisibleChange(!balancesVisible) }
             )
         },
         bottomBar = {
@@ -1829,7 +1850,9 @@ private fun currentMonthBounds(): Pair<Long, Long> {
     return startMillis to start.timeInMillis
 }
 
+@Composable
 private fun formatRupiah(value: Long): String {
+    if (!LocalDuitBalancesVisible.current) return "••••••"
     val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
     formatter.currency = Currency.getInstance("IDR")
     formatter.maximumFractionDigits = 0
