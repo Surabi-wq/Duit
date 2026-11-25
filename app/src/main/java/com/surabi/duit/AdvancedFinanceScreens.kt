@@ -231,7 +231,8 @@ private fun GoalProgressCard(
                     style = MaterialTheme.typography.labelMedium
                 )
                 Spacer(Modifier.weight(1f))
-                Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.SemiBold)
+                Text("Sisa ${financeRupiah(remaining)}", fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             goal.targetDate?.let {
                 Text("Tanggal target: ${financeDate(it)}", style = MaterialTheme.typography.labelSmall,
@@ -259,26 +260,31 @@ private fun BudgetProgressCardAdvanced(budget: BudgetOverviewRow) {
     val remaining = budget.limitMinor - budget.spentMinor
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(budget.name, fontWeight = FontWeight.SemiBold)
-            Text(
-                "${financeDate(budget.periodStart)} – ${financeDate(budget.periodEnd)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(financeRupiah(budget.spentMinor), fontWeight = FontWeight.Bold)
-                Spacer(Modifier.weight(1f))
-                Text("dari ${financeRupiah(budget.limitMinor)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(budget.name, fontWeight = FontWeight.Bold)
+                    Text(
+                        "${financeDate(budget.periodStart)} – ${financeDate(budget.periodEnd)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text("${(ratio * 100).toInt()}%", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (ratio >= 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
             }
+            Text(financeRupiah(budget.spentMinor), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+            Text("Terpakai dari ${financeRupiah(budget.limitMinor)}", style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
             LinearProgressIndicator(
                 progress = { ratio.coerceIn(0.0, 1.0).toFloat() },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(8.dp),
                 color = if (ratio >= 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
