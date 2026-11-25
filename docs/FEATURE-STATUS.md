@@ -1,11 +1,11 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.9.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **1.0.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
 
 ## Sudah memiliki alur kerja nyata
 
 ### Dashboard, workspace, dan akun
-- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
+- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), grafik agregat bulanan enam bulan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
 - Batas saldo minimum dapat diatur per akun; nilai 0 menonaktifkan peringatan. Perubahan dibatasi pada akun di workspace yang sama dan dicatat pada audit log.
@@ -77,6 +77,16 @@ Versi source saat ini: **0.9.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Tidak ada perubahan skema Room, query saldo, atau rumus kekayaan bersih. Tidak ada data dummy.
 - Grafik tren waktu dan pengaturan widget belum diimplementasikan karena membutuhkan query seri waktu serta preferensi persisten; tidak disimulasikan dengan data buatan.
 
+## Perombakan UI/UX struktural — 1.0.0
+
+- Header aplikasi dibuat sebagai brand/workspace bar tersendiri, dengan kontrol workspace berbentuk selector dan aksi tambah workspace.
+- Navigasi bawah menjadi bottom dock khusus lima modul dengan indikator aktif di bagian atas ikon dan permukaan menu terpilih.
+- Dashboard bukan lagi tumpukan komponen lama. Susunan baru berisi sapaan/tanggal, pemilih periode, hero saldo+kekayaan bersih, pemasukan/pengeluaran, grafik tren enam bulan, akses cepat, rekening, perencanaan, peringatan, jatuh tempo, dan aktivitas.
+- Grafik bulanan menggunakan agregasi SQL pada tabel transaksi yang difilter per workspace, periode enam bulan, dan isVoided=0. Hanya baris agregat bulan (maksimal enam) yang dikirim ke UI; tidak mengambil seluruh histori dan tidak menggunakan batas 200 transaksi pada daftar.
+- Tile transaksi dirombak dengan ikon jenis transaksi, nominal yang menonjol, akun, kategori, catatan, serta waktu. Query, pencarian, filter, detail, pembatalan/void, audit log, dan ekspor tetap mempertahankan alur sebelumnya.
+- Perencanaan dan aset diberi latar halaman khusus, banner finansial kontras tinggi, serta kartu progres yang menampilkan angka utama lebih jelas.
+- Tidak ada perubahan entity/schema Room, version database, migrasi, saldo, transfer, rumus cashflow, atau formula kekayaan bersih. Query tren hanya agregasi baca.
+
 ## Temuan audit UI/UX dan status penanganan
 
 **Keparahan tinggi**
@@ -91,9 +101,9 @@ Versi source saat ini: **0.9.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Modul transaksi umum belum memiliki edit, hapus dengan koreksi, duplikasi/template, lampiran, dan impor.
 - Belum ada pengaturan widget dashboard, penyembunyian saldo global, PIN/biometrik, enkripsi database, maupun backup/restore.
 - Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
-- Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menjadi koordinator layar dan dialog yang besar.
+- Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menangani orkestrasi data dan dialog; komponen header, navigasi, dashboard, grafik, dan tile transaksi kini dipindah ke DuitExperience.kt. Pemisahan alur use-case/state management lebih lanjut masih diperlukan.
 
-## Aturan akuntansi penting pada versi 0.9.0
+## Aturan akuntansi penting pada versi 1.0.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
@@ -118,7 +128,7 @@ Versi source saat ini: **0.9.0**. Repositori dikembangkan sebagai aplikasi Andro
 - ERP: perusahaan/cabang/departemen/cost center/proyek terstruktur; penjualan, pembelian, invoice, pelanggan, pemasok, produk, persediaan, gudang, dan HPP.
 - Investasi dengan harga pasar otomatis, dividen, obligasi, dan portofolio.
 - Pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/DOCX, serta impor CSV/spreadsheet.
-- Grafik lengkap, perbandingan periode/workspace, analisis prediktif, rekomendasi cerdas, OCR, dan asisten bahasa sehari-hari.
+- Perbandingan periode/workspace, analisis prediktif, rekomendasi cerdas, OCR, dan asisten bahasa sehari-hari. Grafik tren agregat enam bulan tersedia; grafik prediktif atau perbandingan multi-workspace belum tersedia.
 - Pengguna multi-peran, hak akses, approval berjenjang.
 - PIN/biometrik, enkripsi database, pengamanan lampiran, backup/restore terenkripsi beserta checksum.
 - Pengaturan lengkap, tema gelap, mode pemula/mahir, multi-mata uang.
