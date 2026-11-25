@@ -40,10 +40,16 @@ class FinanceAlertEngineTest {
     }
 
     @Test
-    fun ignoresSettledAndNotYetDueObligations() {
+    fun ignoresSettledAndNotYetDueObligationsIncludingToday() {
         val debt = LiabilityOverviewRow(1, 1, "Lunas", "Bank", 100_000, 0, 1_000, true)
-        val bill = ReceivableOverviewRow(2, 1, "Belum jatuh tempo", "Pelanggan", 80_000, 30_000, 20_000)
-        val alerts = FinanceAlertEngine.evaluate(emptyList(), emptyList(), listOf(debt), listOf(bill), 100, 20, 10_000)
+        val today = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val bill = ReceivableOverviewRow(2, 1, "Jatuh tempo hari ini", "Pelanggan", 80_000, 30_000, today)
+        val alerts = FinanceAlertEngine.evaluate(emptyList(), emptyList(), listOf(debt), listOf(bill), 100, 20, today + 60_000)
         assertTrue(alerts.isEmpty())
     }
 
