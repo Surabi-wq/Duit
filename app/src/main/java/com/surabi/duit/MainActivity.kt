@@ -82,6 +82,7 @@ import com.surabi.duit.data.FinanceDatabase
 import com.surabi.duit.data.FinanceRepository
 import com.surabi.duit.data.GoalOverviewRow
 import com.surabi.duit.data.LiabilityOverviewRow
+import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
@@ -135,8 +136,10 @@ private fun DuitApp(repository: FinanceRepository) {
     var showGoalDialog by remember { mutableStateOf(false) }
     var showAssetDialog by remember { mutableStateOf(false) }
     var showLiabilityDialog by remember { mutableStateOf(false) }
+    var showReceivableDialog by remember { mutableStateOf(false) }
     var selectedGoalMovement by remember { mutableStateOf<Pair<GoalOverviewRow, Boolean>?>(null) }
     var selectedLiabilityPayment by remember { mutableStateOf<LiabilityOverviewRow?>(null) }
+    var selectedReceivableCollection by remember { mutableStateOf<ReceivableOverviewRow?>(null) }
     var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
 
     LaunchedEffect(Unit) { repository.ensureDefaults() }
@@ -155,6 +158,7 @@ private fun DuitApp(repository: FinanceRepository) {
     val goals by remember(workspaceId) { repository.goals(workspaceId) }.collectAsState(initial = emptyList())
     val assets by remember(workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
     val liabilities by remember(workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
+    val receivables by remember(workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
 
     val month = remember { currentMonthBounds() }
     val income by remember(workspaceId, month.first, month.second) {
@@ -165,7 +169,8 @@ private fun DuitApp(repository: FinanceRepository) {
     }.collectAsState(initial = 0L)
     val netWorth = accounts.sumOf { it.balanceMinor } +
         goals.sumOf { it.savedMinor } +
-        assets.sumOf { it.currentValueMinor } -
+        assets.sumOf { it.currentValueMinor } +
+        receivables.sumOf { it.outstandingMinor } -
         liabilities.sumOf { it.outstandingMinor }
 
     Scaffold(
@@ -249,9 +254,12 @@ private fun DuitApp(repository: FinanceRepository) {
                     accounts = accounts,
                     goals = goals,
                     assets = assets,
+                    receivables = receivables,
                     liabilities = liabilities,
                     onAddAccount = { showAccountDialog = true },
                     onAddAsset = { showAssetDialog = true },
+                    onAddReceivable = { showReceivableDialog = true },
+                    onCollectReceivable = { selectedReceivableCollection = it },
                     onAddLiability = { showLiabilityDialog = true },
                     onPayLiability = { selectedLiabilityPayment = it },
                     onUpdateAsset = { selectedAssetForValue = it }
@@ -393,6 +401,40 @@ private fun DuitApp(repository: FinanceRepository) {
                         showLiabilityDialog = false
                         snackbar.showSnackbar("Utang berhasil dicatat.")
                     }.onFailure { snackbar.showSnackbar(it.message ?: "Utang gagal dicatat.") }
+                }
+            }
+        )
+    }
+
+    if (showReceivableDialog) {
+        ReceivableDialog(
+            onDismiss = { showReceivableDialog = false },
+            onSave = { name, counterparty, amount, dueAt, notes ->
+                scope.launch {
+                    runCatching {
+                        repository.createReceivable(workspaceId, name, counterparty, amount, dueAt, notes)
+                    }.onSuccess {
+                        showReceivableDialog = false
+                        snackbar.showSnackbar("Piutang berhasil dicatat.")
+                    }.onFailure { snackbar.showSnackbar(it.message ?: "Piutang gagal dicatat.") }
+                }
+            }
+        )
+    }
+
+    selectedReceivableCollection?.let { receivable ->
+        ReceivableCollectionDialog(
+            receivable = receivable,
+            accounts = accounts,
+            onDismiss = { selectedReceivableCollection = null },
+            onSave = { accountId, amount, note ->
+                scope.launch {
+                    runCatching {
+                        repository.collectReceivable(workspaceId, receivable.id, accountId, amount, note)
+                    }.onSuccess {
+                        selectedReceivableCollection = null
+                        snackbar.showSnackbar("Penerimaan piutang berhasil dicatat dan saldo akun diperbarui.")
+                    }.onFailure { snackbar.showSnackbar(it.message ?: "Penerimaan piutang gagal.") }
                 }
             }
         )
@@ -743,7 +785,7 @@ private fun TransactionCard(
     categoryName: String? = null,
     onVoid: (() -> Unit)? = null
 ) {
-    val isCredit = item.type in setOf("INCOME", "GOAL_WITHDRAWAL", "LIABILITY_RECEIVED")
+    val isCredit = item.type in setOf("INCOME", "GOAL_WITHDRAWAL", "LIABILITY_RECEIVED", "RECEIVABLE_COLLECTION")
     val isDebit = item.type in setOf("EXPENSE", "GOAL_CONTRIBUTION", "LIABILITY_PAYMENT")
     val isTransfer = item.type == "TRANSFER"
     val accent = when {
@@ -1248,6 +1290,7 @@ private fun transactionTypeLabel(type: String): String = when (type) {
     "GOAL_WITHDRAWAL" -> "Penarikan target"
     "LIABILITY_PAYMENT" -> "Pembayaran utang"
     "LIABILITY_RECEIVED" -> "Pencairan pinjaman"
+    "RECEIVABLE_COLLECTION" -> "Penerimaan piutang"
     else -> "Transaksi"
 }
 
