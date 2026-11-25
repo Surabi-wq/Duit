@@ -794,7 +794,7 @@ private fun TransactionsScreen(
                 query = searchQuery,
                 type = typeFilter,
                 startAt = dateBounds!!.startAt,
-                endAt = dateBounds.endAt,
+                endAt = dateBounds!!.endAt,
                 accountId = accountFilterId.takeIf { it != 0L },
                 categoryId = categoryFilterId.takeIf { it != 0L },
                 minAmount = minAmount,
