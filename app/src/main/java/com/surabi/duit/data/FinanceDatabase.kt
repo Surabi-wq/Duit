@@ -12,6 +12,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "workspaces")
@@ -95,13 +97,27 @@ data class CategoryEntity(
             parentColumns = ["id"],
             childColumns = ["categoryId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = SavingsGoalEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["goalId"],
+            onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = LiabilityEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["liabilityId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
         Index(value = ["workspaceId", "occurredAt"]),
         Index("fromAccountId"),
         Index("toAccountId"),
-        Index("categoryId")
+        Index("categoryId"),
+        Index("goalId"),
+        Index("liabilityId")
     ]
 )
 data class TransactionEntity(
@@ -116,7 +132,9 @@ data class TransactionEntity(
     val note: String = "",
     val occurredAt: Long,
     val createdAt: Long,
-    val isVoided: Boolean = false
+    val isVoided: Boolean = false,
+    val goalId: Long? = null,
+    val liabilityId: Long? = null
 )
 
 @Entity(
@@ -169,6 +187,97 @@ data class BudgetOverviewRow(
     val spentMinor: Long
 )
 
+@Entity(
+    tableName = "savings_goals",
+    foreignKeys = [
+        ForeignKey(entity = WorkspaceEntity::class, parentColumns = ["id"], childColumns = ["workspaceId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index("workspaceId")]
+)
+data class SavingsGoalEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: Long,
+    val name: String,
+    val targetMinor: Long,
+    val targetDate: Long?,
+    val priority: Int,
+    val createdAt: Long,
+    val isArchived: Boolean = false
+)
+
+@Entity(
+    tableName = "assets",
+    foreignKeys = [
+        ForeignKey(entity = WorkspaceEntity::class, parentColumns = ["id"], childColumns = ["workspaceId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index("workspaceId"), Index(value = ["workspaceId", "name"])]
+)
+data class AssetEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: Long,
+    val name: String,
+    val category: String,
+    val acquisitionCostMinor: Long,
+    val currentValueMinor: Long,
+    val acquiredAt: Long,
+    val notes: String = "",
+    val updatedAt: Long
+)
+
+@Entity(
+    tableName = "liabilities",
+    foreignKeys = [
+        ForeignKey(entity = WorkspaceEntity::class, parentColumns = ["id"], childColumns = ["workspaceId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index("workspaceId"), Index("dueAt")]
+)
+data class LiabilityEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: Long,
+    val name: String,
+    val counterparty: String,
+    val originalAmountMinor: Long,
+    val dueAt: Long?,
+    val notes: String = "",
+    val createdAt: Long,
+    val isClosed: Boolean = false
+)
+
+@Entity(
+    tableName = "audit_logs",
+    indices = [Index(value = ["workspaceId", "createdAt"]), Index("entityId")]
+)
+data class AuditLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: Long,
+    val entityType: String,
+    val entityId: Long,
+    val action: String,
+    val description: String,
+    val createdAt: Long
+)
+
+data class GoalOverviewRow(
+    val id: Long,
+    val workspaceId: Long,
+    val name: String,
+    val targetMinor: Long,
+    val targetDate: Long?,
+    val priority: Int,
+    val savedMinor: Long
+)
+
+data class LiabilityOverviewRow(
+    val id: Long,
+    val workspaceId: Long,
+    val name: String,
+    val counterparty: String,
+    val originalAmountMinor: Long,
+    val outstandingMinor: Long,
+    val dueAt: Long?,
+    val isClosed: Boolean
+)
+
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM workspaces ORDER BY createdAt ASC")
@@ -203,6 +312,10 @@ interface FinanceDao {
                     WHEN t.type = 'EXPENSE' AND t.fromAccountId = a.id THEN -t.amountMinor
                     WHEN t.type = 'TRANSFER' AND t.fromAccountId = a.id THEN -t.amountMinor
                     WHEN t.type = 'TRANSFER' AND t.toAccountId = a.id THEN t.amountMinor
+                    WHEN t.type = 'GOAL_CONTRIBUTION' AND t.fromAccountId = a.id THEN -t.amountMinor
+                    WHEN t.type = 'GOAL_WITHDRAWAL' AND t.fromAccountId = a.id THEN t.amountMinor
+                    WHEN t.type = 'LIABILITY_PAYMENT' AND t.fromAccountId = a.id THEN -t.amountMinor
+                    WHEN t.type = 'LIABILITY_RECEIVED' AND t.fromAccountId = a.id THEN t.amountMinor
                     ELSE 0
                 END
             ), 0) AS balanceMinor
@@ -252,6 +365,103 @@ interface FinanceDao {
     fun observeExpense(workspaceId: Long, startAt: Long, endAt: Long): Flow<Long>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertGoal(goal: SavingsGoalEntity): Long
+
+    @Query("SELECT * FROM savings_goals WHERE id = :goalId AND workspaceId = :workspaceId AND isArchived = 0 LIMIT 1")
+    suspend fun getGoal(goalId: Long, workspaceId: Long): SavingsGoalEntity?
+
+    @Query("""
+        SELECT g.id AS id, g.workspaceId AS workspaceId, g.name AS name,
+               g.targetMinor AS targetMinor, g.targetDate AS targetDate, g.priority AS priority,
+               COALESCE(SUM(
+                   CASE WHEN t.type = 'GOAL_CONTRIBUTION' AND t.isVoided = 0 THEN t.amountMinor
+                        WHEN t.type = 'GOAL_WITHDRAWAL' AND t.isVoided = 0 THEN -t.amountMinor
+                        ELSE 0 END
+               ), 0) AS savedMinor
+        FROM savings_goals g
+        LEFT JOIN transactions t ON t.goalId = g.id AND t.workspaceId = g.workspaceId
+        WHERE g.workspaceId = :workspaceId AND g.isArchived = 0
+        GROUP BY g.id
+        ORDER BY g.priority DESC, g.createdAt DESC
+    """)
+    fun observeGoals(workspaceId: Long): Flow<List<GoalOverviewRow>>
+
+    @Query("""
+        SELECT COALESCE(SUM(
+            CASE WHEN type = 'GOAL_CONTRIBUTION' THEN amountMinor
+                 WHEN type = 'GOAL_WITHDRAWAL' THEN -amountMinor
+                 ELSE 0 END
+        ), 0)
+        FROM transactions
+        WHERE goalId = :goalId AND workspaceId = :workspaceId AND isVoided = 0
+    """)
+    suspend fun goalSavedAmount(goalId: Long, workspaceId: Long): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAsset(asset: AssetEntity): Long
+
+    @Query("SELECT * FROM assets WHERE workspaceId = :workspaceId ORDER BY updatedAt DESC, id DESC")
+    fun observeAssets(workspaceId: Long): Flow<List<AssetEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertLiability(liability: LiabilityEntity): Long
+
+    @Query("SELECT * FROM liabilities WHERE id = :liabilityId AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun getLiability(liabilityId: Long, workspaceId: Long): LiabilityEntity?
+
+    @Query("""
+        SELECT l.id AS id, l.workspaceId AS workspaceId, l.name AS name,
+               l.counterparty AS counterparty, l.originalAmountMinor AS originalAmountMinor,
+               MAX(0, l.originalAmountMinor - COALESCE(SUM(
+                   CASE WHEN t.type = 'LIABILITY_PAYMENT' AND t.isVoided = 0 THEN t.amountMinor ELSE 0 END
+               ), 0)) AS outstandingMinor,
+               l.dueAt AS dueAt, l.isClosed AS isClosed
+        FROM liabilities l
+        LEFT JOIN transactions t ON t.liabilityId = l.id AND t.workspaceId = l.workspaceId
+        WHERE l.workspaceId = :workspaceId
+        GROUP BY l.id
+        ORDER BY CASE WHEN l.dueAt IS NULL THEN 1 ELSE 0 END, l.dueAt ASC
+    """)
+    fun observeLiabilities(workspaceId: Long): Flow<List<LiabilityOverviewRow>>
+
+    @Query("""
+        SELECT MAX(0, l.originalAmountMinor - COALESCE(SUM(
+            CASE WHEN t.type = 'LIABILITY_PAYMENT' AND t.isVoided = 0 THEN t.amountMinor ELSE 0 END
+        ), 0))
+        FROM liabilities l
+        LEFT JOIN transactions t ON t.liabilityId = l.id AND t.workspaceId = l.workspaceId
+        WHERE l.id = :liabilityId AND l.workspaceId = :workspaceId
+        GROUP BY l.id
+    """)
+    suspend fun liabilityOutstanding(liabilityId: Long, workspaceId: Long): Long?
+
+    @Query("SELECT * FROM transactions WHERE id = :transactionId AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun getTransaction(transactionId: Long, workspaceId: Long): TransactionEntity?
+
+    @Query("UPDATE transactions SET isVoided = 1 WHERE id = :transactionId AND workspaceId = :workspaceId AND isVoided = 0")
+    suspend fun markTransactionVoided(transactionId: Long, workspaceId: Long): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAuditLog(log: AuditLogEntity): Long
+
+    @Query("""
+        SELECT * FROM transactions
+        WHERE workspaceId = :workspaceId AND isVoided = 0
+          AND (:query = '' OR title LIKE '%' || :query || '%' OR note LIKE '%' || :query || '%')
+          AND (:type = 'ALL' OR type = :type)
+          AND occurredAt BETWEEN :startAt AND :endAt
+        ORDER BY occurredAt DESC, id DESC
+        LIMIT 500
+    """)
+    fun searchTransactions(
+        workspaceId: Long,
+        query: String,
+        type: String,
+        startAt: Long,
+        endAt: Long
+    ): Flow<List<TransactionEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertBudget(budget: BudgetEntity): Long
 
     @Query("""
@@ -284,15 +494,87 @@ interface FinanceDao {
         AccountEntity::class,
         CategoryEntity::class,
         TransactionEntity::class,
-        BudgetEntity::class
+        BudgetEntity::class,
+        SavingsGoalEntity::class,
+        AssetEntity::class,
+        LiabilityEntity::class,
+        AuditLogEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
 
     companion object {
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS savings_goals (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        workspaceId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        targetMinor INTEGER NOT NULL,
+                        targetDate INTEGER,
+                        priority INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        isArchived INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_savings_goals_workspaceId ON savings_goals(workspaceId)")
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS assets (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        workspaceId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        acquisitionCostMinor INTEGER NOT NULL,
+                        currentValueMinor INTEGER NOT NULL,
+                        acquiredAt INTEGER NOT NULL,
+                        notes TEXT NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_assets_workspaceId ON assets(workspaceId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_assets_workspaceId_name ON assets(workspaceId, name)")
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS liabilities (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        workspaceId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        counterparty TEXT NOT NULL,
+                        originalAmountMinor INTEGER NOT NULL,
+                        dueAt INTEGER,
+                        notes TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        isClosed INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_liabilities_workspaceId ON liabilities(workspaceId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_liabilities_dueAt ON liabilities(dueAt)")
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        workspaceId INTEGER NOT NULL,
+                        entityType TEXT NOT NULL,
+                        entityId INTEGER NOT NULL,
+                        action TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_audit_logs_workspaceId_createdAt ON audit_logs(workspaceId, createdAt)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_audit_logs_entityId ON audit_logs(entityId)")
+                database.execSQL("ALTER TABLE transactions ADD COLUMN goalId INTEGER REFERENCES savings_goals(id) ON DELETE SET NULL")
+                database.execSQL("ALTER TABLE transactions ADD COLUMN liabilityId INTEGER REFERENCES liabilities(id) ON DELETE SET NULL")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_goalId ON transactions(goalId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_liabilityId ON transactions(liabilityId)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: FinanceDatabase? = null
 
@@ -302,7 +584,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "duit-local.db"
-                ).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
             }
         }
     }
