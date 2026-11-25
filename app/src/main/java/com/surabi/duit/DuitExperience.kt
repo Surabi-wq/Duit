@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
@@ -98,7 +100,7 @@ internal fun DuitAppHeader(
 ) {
     var expanded by remember { mutableStateOf(false) }
     val current = workspaces.firstOrNull { it.id == selectedId }
-    Surface(color = Color.White, shadowElevation = 3.dp) {
+    Surface(modifier = Modifier.statusBarsPadding(), color = Color.White, shadowElevation = 3.dp) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -156,7 +158,7 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
         "Aset" to Icons.Filled.AccountBalanceWallet,
         "Panduan" to Icons.Filled.Info
     )
-    Surface(color = Color.White, shadowElevation = 16.dp, tonalElevation = 1.dp) {
+    Surface(modifier = Modifier.navigationBarsPadding(), color = Color.White, shadowElevation = 16.dp, tonalElevation = 1.dp) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -165,7 +167,7 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
             navigation.forEachIndexed { index, item ->
                 val selected = selectedIndex == index
                 Column(
-                    modifier = Modifier.weight(1f).height(58.dp)
+                    modifier = Modifier.weight(1f)
                         .clip(RoundedCornerShape(15.dp))
                         .clickable { onSelect(index) }
                         .padding(horizontal = 2.dp, vertical = 3.dp),
