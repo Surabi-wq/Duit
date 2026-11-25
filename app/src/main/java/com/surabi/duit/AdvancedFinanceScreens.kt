@@ -197,7 +197,8 @@ fun WealthScreen(
     onAddAccount: () -> Unit,
     onAddAsset: () -> Unit,
     onAddLiability: () -> Unit,
-    onPayLiability: (LiabilityOverviewRow) -> Unit
+    onPayLiability: (LiabilityOverviewRow) -> Unit,
+    onUpdateAsset: (AssetEntity) -> Unit
 ) {
     val accountsTotal = accounts.sumOf { it.balanceMinor }
     val assetsTotal = assets.sumOf { it.currentValueMinor }
@@ -273,6 +274,10 @@ fun WealthScreen(
                     }
                     Text("Kepada ${debt.counterparty} • Awal ${financeRupiah(debt.originalAmountMinor)}",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    debt.dueAt?.let { due ->
+                        Text("Jatuh tempo: " + financeDate(due), style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     if (debt.outstandingMinor == 0L) {
                         Text("Lunas", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
                     } else {
@@ -399,6 +404,34 @@ fun AssetDialog(onDismiss: () -> Unit, onSave: (String, String, Long, Long, Stri
 }
 
 @Composable
+fun AssetValueDialog(
+    asset: AssetEntity,
+    onDismiss: () -> Unit,
+    onSave: (Long) -> Unit
+) {
+    var value by remember(asset.id) { mutableStateOf(asset.currentValueMinor.toString()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Perbarui nilai aset") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(asset.name, fontWeight = FontWeight.SemiBold)
+                Text("Harga perolehan: ${financeRupiah(asset.acquisitionCostMinor)}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(value, { value = it.filter(Char::isDigit) },
+                    label = { Text("Nilai saat ini (rupiah)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = value.toLongOrNull() != null, onClick = { onSave(value.toLong()) }) { Text("Simpan nilai") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    )
+}
+
+@Composable
 fun LiabilityDialog(
     accounts: List<AccountBalanceRow>,
     onDismiss: () -> Unit,
@@ -408,7 +441,9 @@ fun LiabilityDialog(
     var counterparty by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var accountId by remember { mutableLongStateOf(0L) }
+    var dueDateText by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    val parsedDueDate = parseFinanceDate(dueDateText)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Catat utang atau pinjaman") },
@@ -418,6 +453,9 @@ fun LiabilityDialog(
                 OutlinedTextField(counterparty, { counterparty = it }, label = { Text("Pemberi pinjaman") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(amount, { amount = it.filter(Char::isDigit) }, label = { Text("Nilai awal (rupiah)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(dueDateText, { dueDateText = it }, label = { Text("Jatuh tempo (dd-MM-yyyy, opsional)") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    supportingText = { if (dueDateText.isNotBlank() && parsedDueDate == null) Text("Gunakan format tanggal dd-MM-yyyy.") })
                 FinanceIdPicker("Masukkan dana pinjaman ke akun (opsional)", accountId,
                     listOf(0L to "Tidak, dana sudah ada / tidak dicairkan") + accounts.map { it.id to it.name },
                     { accountId = it })
@@ -427,8 +465,9 @@ fun LiabilityDialog(
             }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank() && counterparty.isNotBlank() && amount.toLongOrNull()?.let { it > 0L } == true,
-                onClick = { onSave(name, counterparty, amount.toLong(), null, accountId.takeIf { it != 0L }, notes) }) { Text("Simpan") }
+            TextButton(enabled = name.isNotBlank() && counterparty.isNotBlank() &&
+                amount.toLongOrNull()?.let { it > 0L } == true && (dueDateText.isBlank() || parsedDueDate != null),
+                onClick = { onSave(name, counterparty, amount.toLong(), parsedDueDate, accountId.takeIf { it != 0L }, notes) }) { Text("Simpan") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
     )
@@ -501,6 +540,18 @@ private fun FinanceChoicePicker(label: String, selected: String, options: List<P
         }
     }
 }
+
+private fun parseFinanceDate(input: String): Long? {
+    if (input.isBlank()) return null
+    return runCatching {
+        java.text.SimpleDateFormat("dd-MM-yyyy", Locale("id", "ID")).apply {
+            isLenient = false
+        }.parse(input.trim())?.time
+    }.getOrNull()
+}
+
+private fun financeDate(value: Long): String =
+    java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date(value))
 
 private fun financeRupiah(value: Long): String {
     return NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
