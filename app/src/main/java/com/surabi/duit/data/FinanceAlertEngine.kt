@@ -88,7 +88,7 @@ object FinanceAlertEngine {
                 )
             }
 
-        receivables.filter { it.outstandingMinor > 0L && it.dueAt != null && it.dueAt < now }
+        receivables.filter { it.outstandingMinor > 0L && it.dueAt != null && isOverdue(it.dueAt, now) }
             .forEach { bill ->
                 alerts += FinanceAlert(
                     "Piutang melewati jatuh tempo",
