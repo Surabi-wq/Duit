@@ -276,18 +276,45 @@ private fun EmptyFinanceCard(title: String, body: String) {
 }
 
 @Composable
-fun SavingsGoalDialog(onDismiss: () -> Unit, onSave: (String, Long, Int) -> Unit) {
+fun SavingsGoalDialog(onDismiss: () -> Unit, onSave: (String, Long, Long?, Int) -> Unit) {
     var name by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
+    var targetDateText by remember { mutableStateOf("") }
     var priority by remember { mutableStateOf(3) }
+    val parsedTargetDate = parseFinanceDate(targetDateText)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Buat target tabungan") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text("Nama target") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-                OutlinedTextField(amount, { amount = it.filter(Char::isDigit) }, label = { Text("Target (rupiah)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), singleLine = true)
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    name, { name = it.take(80) },
+                    label = { Text("Nama target") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    amount, { amount = it.filter(Char::isDigit) },
+                    label = { Text("Target (rupiah)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = targetDateText,
+                    onValueChange = { targetDateText = it.take(10) },
+                    label = { Text("Tanggal target (dd-MM-yyyy, opsional)") },
+                    supportingText = {
+                        if (targetDateText.isNotBlank() && parsedTargetDate == null) {
+                            Text("Masukkan tanggal kalender yang valid, format dd-MM-yyyy.")
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Text("Prioritas", style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     (1..5).forEach { value ->
@@ -297,8 +324,11 @@ fun SavingsGoalDialog(onDismiss: () -> Unit, onSave: (String, Long, Int) -> Unit
             }
         },
         confirmButton = {
-            TextButton(enabled = name.isNotBlank() && amount.toLongOrNull()?.let { it > 0L } == true,
-                onClick = { onSave(name, amount.toLong(), priority) }) { Text("Simpan") }
+            TextButton(
+                enabled = name.isNotBlank() && amount.toLongOrNull()?.let { it > 0L } == true &&
+                    (targetDateText.isBlank() || parsedTargetDate != null),
+                onClick = { onSave(name, amount.toLong(), parsedTargetDate, priority) }
+            ) { Text("Simpan") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
     )
