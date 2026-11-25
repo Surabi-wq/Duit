@@ -44,7 +44,7 @@ class TransactionDateRangeTest {
     @Test
     fun emptyBoundUsesUnboundedTimestamp() {
         val bounds = requireNotNull(TransactionDateRange.parse("", ""))
-        assertEquals(0L, bounds.startAt)
+        assertEquals(Long.MIN_VALUE, bounds.startAt)
         assertEquals(Long.MAX_VALUE, bounds.endAt)
     }
 }
