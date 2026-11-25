@@ -98,21 +98,23 @@ Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ## Temuan audit UI/UX dan status penanganan
 
-**Keparahan tinggi**
-- Riwayat transaksi hanya memuat maksimal 500 hasil. Pengelompokan tanggal dan detail telah ditambahkan, tetapi pagination/muat bertahap untuk ribuan transaksi masih belum ditangani.
-- Aplikasi belum memiliki backup/restore database penuh tervalidasi; ekspor CSV tetap bukan cadangan penuh.
+**Keparahan tinggi — sudah ditangani pada 1.1.0**
+- Batas 500 hasil pada layar riwayat transaksi dihilangkan dengan query SQLite berhalaman 50 baris dan query jumlah hasil terpisah.
+- Ekspor CSV kini mengambil seluruh hasil yang cocok dengan pencarian/filter secara bertahap per batch 500 baris; tidak lagi hanya mengekspor baris yang tampil di layar.
 
-**Keparahan sedang**
-- UI sebelumnya memiliki satu layar orkestrasi besar, tema yang hanya mendefinisikan warna, transaksi tanpa detail, panduan statis, dan dashboard tanpa pilihan periode. Design tokens, reusable components, detail transaksi, pencarian panduan, serta filter periode kini ditambahkan.
-- Tampilan aset, anggaran, target, dan navigasi sebelumnya kurang terstruktur. Halaman kini dipisah berdasarkan kategori dan menampilkan ringkasan/progres.
+**Keparahan sedang — sudah ditangani sebagian**
+- Filter lanjutan dipindahkan ke dialog agar tidak memakan ruang vertikal layar riwayat; pencarian, filter tanggal, akun, kategori, jenis, nominal, dan urutan tetap dijalankan di database.
+- Pengguna dapat menyamarkan nominal seluruh halaman keuangan dan mengatur tujuh widget dashboard; kedua preferensi disimpan lokal.
+- Query ringkasan transaksi dashboard diperkecil ke 20 entri terbaru, sementara total transaksi dihitung terpisah.
+- Navigasi bawah menandai tab aktif secara visual dan semantik; header dipadatkan untuk layar sempit.
 
 **Keparahan yang masih terbuka**
-- Modul transaksi umum belum memiliki edit, hapus dengan koreksi, duplikasi/template, lampiran, dan impor.
-- Belum ada pengaturan widget dashboard, penyembunyian saldo global, PIN/biometrik, enkripsi database, maupun backup/restore.
-- Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
-- Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menangani orkestrasi data dan dialog; komponen header, navigasi, dashboard, grafik, dan tile transaksi kini dipindah ke DuitExperience.kt. Pemisahan alur use-case/state management lebih lanjut masih diperlukan.
+- Modul transaksi umum belum memiliki edit transaksi, duplikasi/template, lampiran, dan impor. Pembatalan transaksi tetap melalui void dan audit trail.
+- Backup/restore database penuh, PIN/biometrik, penguncian aplikasi, enkripsi database, dan mekanisme pemulihan data belum tersedia.
+- Belum ada UI automation menyeluruh, uji aksesibilitas otomatis, uji font sistem maksimum, uji beragam ukuran layar, maupun uji instalasi pada perangkat Android fisik.
+- Modularisasi lebih lanjut masih diperlukan; MainActivity tetap mengatur orkestrasi data dan dialog. Pemisahan use-case/state management ke lapisan tersendiri belum selesai.
 
-## Aturan akuntansi penting pada versi 1.0.0
+## Aturan akuntansi penting pada versi 1.1.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.

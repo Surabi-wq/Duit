@@ -74,8 +74,8 @@ Catatan cakupan versi 1.1.0: histori dapat ditelusuri dengan pemuatan bertahap d
 - Pencarian transaksi dijalankan langsung pada SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi.
 - Filter lanjutan mencakup rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, serta pengurutan berdasarkan tanggal atau nominal.
 - Validasi tanggal menolak tanggal kalender yang tidak sah, teks tambahan, dan rentang tanggal terbalik.
-- Hasil pencarian menampilkan maksimal 500 transaksi terbaru yang cocok; filter jenis mencakup transaksi khusus seperti setoran target, pembayaran utang, dan penerimaan piutang.
-- Ekspor CSV menyimpan hasil pencarian dan filter yang sedang ditampilkan melalui pemilih lokasi simpan Android. Ekspor dibatasi maksimal 500 baris dan bukan pengganti backup database.
+- Histori transaksi menampilkan 50 baris per halaman dengan total hasil aktual dari SQLite; filter jenis mencakup transaksi khusus seperti setoran target, pembayaran utang, dan penerimaan piutang.
+- Ekspor CSV mencakup seluruh hasil pencarian dan filter melalui pemilih lokasi simpan Android, dengan pembacaan/penulisan bertahap per batch 500 baris. Ini bukan pengganti backup database.
 - Pembatalan transaksi menggunakan status void dengan alasan; histori tidak dihapus dan pembatalan dicatat pada audit log.
 
 ### Anggaran dan target tabungan
@@ -141,11 +141,11 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.0.0.
+Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.1.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 
-Ekspor hanya mencakup hasil pencarian yang ditampilkan (maksimal 500 transaksi terbaru yang cocok). File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
+Ekspor mencakup seluruh transaksi yang cocok dengan filter pada saat ekspor dimulai; data dibaca dan ditulis bertahap per batch agar tidak memuat seluruh histori ke memori. File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
 
 ## Pengujian dan batas verifikasi
 

@@ -214,7 +214,7 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
                             tint = if (isItemSelected) DuitGreen else Color(0xFF819087), modifier = Modifier.size(20.dp))
                     }
                     Text(item.first, style = MaterialTheme.typography.labelSmall,
-                        color = if (selected) DuitGreen else Color(0xFF78877F),
+                        color = if (isItemSelected) DuitGreen else Color(0xFF78877F),
                         fontWeight = if (isItemSelected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
@@ -701,7 +701,6 @@ internal fun DuitTransactionTile(
     }
 }
 
-@Composable
 @Composable
 private fun duitMoney(value: Long): String = duitDisplayAmount(
     NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
