@@ -1,6 +1,6 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.4.0**. Repositori dimulai dari kondisi kosong dan dikembangkan sebagai aplikasi Android lokal/offline.
+Versi source saat ini: **0.5.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -12,7 +12,9 @@ Versi source saat ini: **0.4.0**. Repositori dimulai dari kondisi kosong dan dik
 
 ### Transaksi dan kontrol data
 - Pemasukan, pengeluaran, dan transfer antar-akun.
-- Pencarian keterangan/catatan/kategori dan filter jenis pada 200 transaksi terbaru workspace.
+- Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi; hasil dibatasi 500 transaksi terbaru yang cocok.
+- Filter jenis mencakup pemasukan, pengeluaran, transfer, dan tipe khusus (misalnya setoran target, pembayaran utang, pencairan pinjaman, dan penerimaan piutang).
+- Ekspor CSV dari hasil pencarian yang sedang ditampilkan melalui Android Storage Access Framework; maksimal 500 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
 - Pembatalan transaksi (void) dengan alasan yang tersimpan pada audit log; catatan transaksi tidak dihapus.
 - Validasi akun/kategori harus berasal dari workspace yang sama.
 - Semua insert yang terkait dilakukan dalam transaksi database Room.
@@ -42,10 +44,11 @@ Versi source saat ini: **0.4.0**. Repositori dimulai dari kondisi kosong dan dik
 
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
+- Database versi 3 dengan migrasi eksplisit versi 1→2 dan 2→3; tidak memakai destructive migration.
 - Migrasi database versi 1 ke versi 2 dan versi 2 ke versi 3; tidak memakai destructive migration.
 - Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
-- CI menjalankan unit test dan build APK Release.
+- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, serta escaping dan perlindungan formula pada CSV.
 
 ## Aturan akuntansi penting pada versi 0.4.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
@@ -63,7 +66,8 @@ Versi source saat ini: **0.4.0**. Repositori dimulai dari kondisi kosong dan dik
 - Edit/hapus piutang, pembagian satu piutang ke beberapa invoice, riwayat perubahan rinci, dan pengingat jatuh tempo piutang.
 - Edit transaksi umum, riwayat versi detail, dan reversal jurnal double-entry.
 - Rekonsiliasi rekening dan penyesuaian saldo formal.
-- Lampiran struk/dokumen, transaksi berulang/terjadwal/massal, template, impor dan ekspor.
+- Lampiran struk/dokumen, transaksi berulang/terjadwal/massal, template, dan impor CSV/spreadsheet.
+- Ekspor PDF/Excel/DOCX, laporan profesional, serta ekspor seluruh histori dengan pagination.
 - Target dengan jadwal kontribusi otomatis dan notifikasi pengingat.
 - Penyusutan, jadwal pemeliharaan, penjualan/penghapusan aset melalui jurnal.
 - Integrasi piutang dengan invoice/penjualan kredit dan jurnal pendapatan; analisis umur piutang, bunga/denda terstruktur, jadwal cicilan otomatis, serta laporan penagihan lanjutan.
