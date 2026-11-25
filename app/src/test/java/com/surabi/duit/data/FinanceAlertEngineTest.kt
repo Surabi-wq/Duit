@@ -31,9 +31,11 @@ class FinanceAlertEngineTest {
 
     @Test
     fun warnsForNegativeCashflowAndOverdueDebtAndReceivable() {
-        val debt = LiabilityOverviewRow(1, 1, "Pinjaman", "Bank", 100_000, 50_000, 1_000, false)
-        val bill = ReceivableOverviewRow(2, 1, "Invoice", "Pelanggan", 80_000, 30_000, 1_000)
-        val alerts = FinanceAlertEngine.evaluate(emptyList(), emptyList(), listOf(debt), listOf(bill), 10, 20, 10_000)
+        val now = 1_000_000_000L
+        val overdueDate = now - 3L * 24L * 60L * 60L * 1000L
+        val debt = LiabilityOverviewRow(1, 1, "Pinjaman", "Bank", 100_000, 50_000, overdueDate, false)
+        val bill = ReceivableOverviewRow(2, 1, "Invoice", "Pelanggan", 80_000, 30_000, overdueDate)
+        val alerts = FinanceAlertEngine.evaluate(emptyList(), emptyList(), listOf(debt), listOf(bill), 10, 20, now)
         assertEquals(3, alerts.size)
         assertEquals(1, alerts.count { it.severity == FinanceAlertSeverity.CRITICAL })
         assertTrue(alerts.any { it.title == "Arus kas bulan ini negatif" })
