@@ -334,6 +334,9 @@ interface FinanceDao {
     @Query("SELECT * FROM accounts WHERE id = :accountId AND workspaceId = :workspaceId LIMIT 1")
     suspend fun getAccount(accountId: Long, workspaceId: Long): AccountEntity?
 
+    @Query("UPDATE accounts SET minimumBalanceMinor = :minimumBalanceMinor WHERE id = :accountId AND workspaceId = :workspaceId")
+    suspend fun updateAccountMinimumBalance(accountId: Long, workspaceId: Long, minimumBalanceMinor: Long): Int
+
     @Query("""
         SELECT
             a.id AS id,
