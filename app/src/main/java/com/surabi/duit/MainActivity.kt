@@ -692,6 +692,31 @@ private fun WorkspacePicker(
 }
 
 @Composable
+private fun DashboardPeriodPicker(
+    period: DashboardPeriod,
+    onSelected: (DashboardPeriod) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        OutlinedButton(onClick = { expanded = true }) {
+            Text(DashboardPeriodResolver.label(period), maxLines = 1)
+            Icon(Icons.Filled.ExpandMore, contentDescription = null)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DashboardPeriod.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(DashboardPeriodResolver.label(option)) },
+                    onClick = {
+                        onSelected(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun DashboardScreen(
     workspaceName: String,
     accounts: List<AccountBalanceRow>,
@@ -734,18 +759,7 @@ private fun DashboardScreen(
             title = "Ringkasan keuangan",
             subtitle = "$workspaceName • kondisi keuangan aktual",
             trailing = {
-                ChoiceDropdown(
-                    label = "Periode",
-                    selected = period.name,
-                    options = listOf(
-                        DashboardPeriod.THIS_MONTH.name to "Bulan ini",
-                        DashboardPeriod.LAST_30_DAYS.name to "30 hari",
-                        DashboardPeriod.THIS_YEAR.name to "Tahun ini"
-                    ),
-                    onSelected = { value ->
-                        runCatching { DashboardPeriod.valueOf(value) }.getOrNull()?.let(onPeriodChange)
-                    }
-                )
+                DashboardPeriodPicker(period = period, onSelected = onPeriodChange)
             }
         )
 
