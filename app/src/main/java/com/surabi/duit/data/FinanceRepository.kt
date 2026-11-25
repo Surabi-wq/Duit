@@ -25,6 +25,9 @@ class FinanceRepository(private val database: FinanceDatabase) {
     fun expenses(workspaceId: Long, startAt: Long, endAt: Long): Flow<Long> =
         dao.observeExpense(workspaceId, startAt, endAt)
 
+    fun monthlyCashflow(workspaceId: Long, startAt: Long, endAt: Long): Flow<List<MonthlyCashflowRow>> =
+        dao.observeMonthlyCashflow(workspaceId, startAt, endAt)
+
     fun budgets(workspaceId: Long): Flow<List<BudgetOverviewRow>> =
         dao.observeBudgetOverview(workspaceId)
 

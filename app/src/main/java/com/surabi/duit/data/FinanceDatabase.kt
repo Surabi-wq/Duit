@@ -174,6 +174,12 @@ data class BudgetEntity(
     val createdAt: Long
 )
 
+data class MonthlyCashflowRow(
+    val monthKey: String,
+    val incomeMinor: Long,
+    val expenseMinor: Long
+)
+
 data class AccountBalanceRow(
     val id: Long,
     val workspaceId: Long,
@@ -403,6 +409,21 @@ interface FinanceDao {
         AND isVoided = 0 AND occurredAt BETWEEN :startAt AND :endAt
     """)
     fun observeExpense(workspaceId: Long, startAt: Long, endAt: Long): Flow<Long>
+
+    @Query("""
+        SELECT
+            strftime('%Y-%m', occurredAt / 1000, 'unixepoch', 'localtime') AS monthKey,
+            COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amountMinor ELSE 0 END), 0) AS incomeMinor,
+            COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amountMinor ELSE 0 END), 0) AS expenseMinor
+        FROM transactions
+        WHERE workspaceId = :workspaceId
+          AND isVoided = 0
+          AND type IN ('INCOME', 'EXPENSE')
+          AND occurredAt BETWEEN :startAt AND :endAt
+        GROUP BY monthKey
+        ORDER BY monthKey ASC
+    """)
+    fun observeMonthlyCashflow(workspaceId: Long, startAt: Long, endAt: Long): Flow<List<MonthlyCashflowRow>>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertGoal(goal: SavingsGoalEntity): Long

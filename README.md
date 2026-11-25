@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **0.9.0**
+- Versi: **1.0.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -14,13 +14,23 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Database Room: versi 3
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
 
+## Perombakan pengalaman aplikasi versi 1.0.0
+
+- Struktur aplikasi diganti dengan header workspace khusus, identitas merek baru, serta bottom dock lima menu dengan indikator aktif sendiri; bukan sekadar perubahan warna Material.
+- Dashboard dirancang ulang dari awal: sapaan kontekstual dan tanggal, filter periode, saldo tersedia dan kekayaan bersih dalam satu hero, kartu uang masuk/keluar, tren bulanan, akses cepat, ringkasan rekening, rencana, peringatan, jatuh tempo, dan aktivitas terbaru.
+- Grafik enam bulan menggunakan agregasi SUM pada Room/SQLite per bulan dan workspace. Histori tidak ditarik ke memori dan bukan berasal dari batas 200 transaksi pada daftar dashboard.
+- Transaksi memakai hierarki halaman dan tile aktivitas baru yang menampilkan nominal, akun, kategori, waktu, dan catatan; pencarian, filter, detail, void/audit, dan ekspor CSV tetap menggunakan alur lama.
+- Perencanaan memakai hero target tabungan, ringkasan jumlah sasaran/anggaran, dan kartu progres dengan nominal terkumpul, kekurangan, persentase, tanggal target, setor/tarik.
+- Aset/kewajiban memakai banner kekayaan bersih dan latar modul yang berbeda dari halaman lama.
+- Database tetap Room versi 3. Query tren adalah agregasi baca-saja; tidak ada migrasi, tidak ada perubahan rumus saldo/kekayaan bersih, dan tidak ada data demo.
+
 ## Penyegaran visual UI/UX versi 0.9.0
 
 - Hero saldo bergradasi hijau-biru, identitas merek dan ikon launcher yang diperbarui.
 - Latar aplikasi dibuat lebih terang; kartu metrik memakai aksen warna semantik, batas halus, dan hierarki tipografi yang lebih tegas.
 - Dashboard menampilkan pilihan periode sebagai chip, saldo akun, kekayaan bersih, pemasukan/pengeluaran, arus kas dengan dua indikator terpisah, saldo per akun, peringatan, anggaran, target, jatuh tempo, dan transaksi terbaru.
 - Kartu transaksi, target, anggaran, aset, piutang, dan kewajiban menggunakan radius, border, elevasi, dan warna status yang konsisten.
-- Tidak ada angka contoh yang ditambahkan. Visual ringkasan tetap berdasarkan data Room lokal. Grafik tren harian belum ditambahkan karena query historis terstruktur untuk rentang tersebut belum tersedia; tidak menggunakan data sintetis.
+- Tidak ada angka contoh yang ditambahkan. Visual ringkasan tetap berdasarkan data Room lokal. Grafik tren enam bulan sekarang dibuat dari agregasi bulanan Room/SQLite, bukan dari 200 transaksi terbaru atau angka sintetis.
 
 ## Fitur yang sudah memiliki alur kerja nyata
 
@@ -113,7 +123,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.9.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.0.0.apk**.
 
 ## Signing dan distribusi
 
@@ -121,7 +131,7 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.8.0.
+Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.0.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 
