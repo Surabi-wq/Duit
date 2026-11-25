@@ -19,13 +19,13 @@ object TransactionCsvExporter {
     }
 
     fun appendHeader(target: Appendable) {
-        target.append('\\uFEFF')
+        target.append('\uFEFF')
         target.append(
             listOf(
                 "ID", "Tanggal dan waktu", "Jenis", "Keterangan", "Akun sumber",
                 "Akun tujuan", "Kategori", "Nominal (IDR)", "Catatan"
             ).joinToString(",") { csvCell(it) }
-        ).append('\\n')
+        ).append('\n')
     }
 
     fun appendRows(
@@ -47,7 +47,7 @@ object TransactionCsvExporter {
                 transaction.amountMinor.toString(),
                 transaction.note
             )
-            target.append(values.joinToString(",") { csvCell(it) }).append('\\n')
+            target.append(values.joinToString(",") { csvCell(it) }).append('\n')
         }
     }
 
