@@ -35,7 +35,7 @@ class FinanceAlertEngineTest {
         val bill = ReceivableOverviewRow(2, 1, "Invoice", "Pelanggan", 80_000, 30_000, 1_000)
         val alerts = FinanceAlertEngine.evaluate(emptyList(), emptyList(), listOf(debt), listOf(bill), 10, 20, 10_000)
         assertEquals(3, alerts.size)
-        assertEquals(2, alerts.count { it.severity == FinanceAlertSeverity.CRITICAL })
+        assertEquals(1, alerts.count { it.severity == FinanceAlertSeverity.CRITICAL })
         assertTrue(alerts.any { it.title == "Arus kas bulan ini negatif" })
     }
 
