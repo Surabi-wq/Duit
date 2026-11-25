@@ -247,6 +247,7 @@ private fun DuitApp(repository: FinanceRepository) {
                 )
                 AppTab.ACCOUNTS -> WealthScreen(
                     accounts = accounts,
+                    goals = goals,
                     assets = assets,
                     liabilities = liabilities,
                     onAddAccount = { showAccountDialog = true },
