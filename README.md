@@ -1,53 +1,91 @@
-# Duit — Pengelola Keuangan
+# Duit — Pengelola Keuangan Offline
 
-Duit adalah aplikasi Android native untuk mengelola keuangan secara lokal dan offline. Identitas visual awal menggunakan palet hijau, putih, dan biru.
+Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lokal. Identitas visual menggunakan hijau, putih, dan biru. Data inti disimpan secara lokal melalui Room/SQLite; aplikasi tidak memerlukan koneksi internet untuk alur yang tersedia.
 
-## Status pengembangan — versi 0.2.0
+## Versi source
 
-Repositori ini sebelumnya kosong. Proyek sedang dibangun dari dasar dan dikembangkan bertahap. Versi awal memprioritaskan fondasi data yang benar sebelum modul ERP yang lebih kompleks.
+- Versi: **0.2.0**
+- Package: `com.surabi.duit`
+- Minimum Android: API 23
+- Compile/target SDK: 36
+- Kotlin: 2.3.21
+- Android Gradle Plugin: 8.13.2
+- Penyimpanan: Room di atas SQLite
+- Nilai uang: integer Rupiah (`Long`), tanpa floating-point
 
-### Fungsi yang tersedia pada 0.2.0
-- Dashboard per workspace dengan ringkasan saldo, pemasukan, dan pengeluaran periode berjalan.
-- Workspace terpisah untuk ruang keuangan yang berbeda.
-- Banyak akun/dompet di dalam workspace.
-- Pencatatan pemasukan, pengeluaran, dan transfer antar-akun.
-- Kategori pemasukan/pengeluaran bawaan.
-- Daftar transaksi terbaru.
-- Anggaran bulanan dan pemantauan realisasi.
-- Penyimpanan lokal menggunakan Room di atas SQLite.
-- Validasi jumlah transaksi dan kepemilikan akun terhadap workspace.
-- Pencarian/filter transaksi terbaru serta pembatalan dengan alasan dan audit log.\n- Target tabungan, aset non-tunai, utang, pembayaran pokok, dan estimasi kekayaan bersih.\n- Migrasi Room v1→v2 tanpa destructive migration.\n- Build varian Release untuk pengujian distribusi APK.
+## Fitur yang sudah tersedia
 
-### Belum dinyatakan selesai
-Modul aset, utang-piutang, investasi, pajak, akuntansi double-entry, ERP, gudang, OCR, analisis prediktif, multi-user, persetujuan berjenjang, enkripsi backup, dan impor/ekspor dokumen merupakan tahapan lanjutan. Modul-modul tersebut tidak boleh dianggap aktif sebelum memiliki alur data, validasi, antarmuka, dan pengujian.
+### Workspace, akun, dan dashboard
+- Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
+- Banyak akun per workspace: tunai, bank, tabungan, e-wallet, kartu kredit, investasi, dan lainnya.
+- Saldo akun dihitung dari saldo awal serta transaksi; bukan disimpan sebagai angka yang dapat tertinggal dari histori.
+- Dashboard menampilkan saldo akun, pemasukan, pengeluaran, arus kas bulan berjalan, anggaran, dan estimasi kekayaan bersih.
 
-## Teknologi
-- Kotlin dan Android SDK.
-- Jetpack Compose + Material 3.
-- Room / SQLite, foreign key, index, dan operasi database transaksional.
-- Semua operasi inti berjalan tanpa koneksi internet.
-- Mata uang awal: IDR. Nilai uang disimpan sebagai integer rupiah, bukan floating point.
+### Transaksi
+- Pemasukan, pengeluaran, dan transfer antar-akun.
+- Validasi akun dan kategori harus berasal dari workspace yang sama.
+- Transfer mengurangi akun sumber dan menambah akun tujuan tanpa mengubah total pemasukan/pengeluaran.
+- Pencarian/filter pada 200 transaksi terbaru di workspace berdasarkan keterangan, catatan, kategori, dan jenis.
+- Pembatalan transaksi dengan alasan; histori tidak dihapus, transaksi ditandai void dan alasan masuk ke audit log.
 
-## Menjalankan build
-Gunakan Android Studio yang mendukung Android Gradle Plugin pada proyek ini, JDK 17, dan Android SDK Platform 36.
+### Anggaran dan target tabungan
+- Anggaran bulanan umum atau berdasarkan kategori pengeluaran.
+- Target tabungan dengan nominal tujuan dan prioritas.
+- Setoran target mengurangi saldo akun yang dipilih; penarikan mengembalikan saldo akun.
+- Dana target dihitung dari transaksi setoran/penarikan yang terkait, bukan input saldo manual yang tidak tersinkron.
 
-Perintah build: gradle :app:assembleDebug atau gradle :app:assembleRelease.
+### Aset dan kewajiban
+- Pencatatan aset non-tunai: kendaraan, properti, tanah, emas, elektronik, peralatan, dan lainnya.
+- Harga perolehan dan nilai saat ini; nilai aset dapat diperbarui dengan pencatatan audit.
+- Pencatatan utang/pinjaman, pemberi pinjaman, nilai awal, dan tanggal jatuh tempo opsional.
+- Pencairan pinjaman dapat menambah saldo akun ketika dana baru diterima dan belum tercatat.
+- Pembayaran pokok utang mengurangi saldo akun dan sisa kewajiban.
+- Estimasi kekayaan bersih dihitung dari saldo akun + dana target + nilai aset non-tunai − sisa utang.
 
-APK CI dibuat dari varian Release dan diberi nama Duit-0.2.0.apk. Sertifikat debug bawaan Gradle hanya untuk pengujian internal; sebelum distribusi komersial, buat signing key pribadi dan ganti konfigurasi signing release. Jangan membagikan keystore atau password ke repositori.
+## Aturan pencatatan untuk mencegah penghitungan ganda
 
-## Prinsip data
-- Tidak ada saldo/transaksi keuangan contoh yang dimasukkan sebagai data pengguna.
-- Saat pertama dijalankan aplikasi membuat workspace Pribadi, akun Dompet Utama dengan saldo awal Rp0, dan kategori bawaan.
-- Transfer tidak dihitung sebagai pemasukan atau pengeluaran.
-- Penghapusan workspace/akun tidak disediakan pada fondasi awal untuk mengurangi risiko kehilangan histori.
-- Perubahan skema database di masa depan wajib memakai migration teruji. Jangan gunakan destructive migration untuk data pengguna.
+- Jangan masukkan saldo rekening/dompet sebagai aset non-tunai; rekening dan dompet sudah masuk melalui modul akun.
+- Saat mencatat utang yang dananya sudah pernah dimasukkan ke saldo akun, jangan pilih akun penerima lagi.
+- Pencairan pinjaman bukan pemasukan; pembayaran pokok utang bukan seluruhnya pengeluaran.
+- Setoran target bukan pengeluaran; penarikan target bukan pemasukan.
+- Versi ini belum memiliki alur pembelian/penjualan aset yang otomatis membuat jurnal dan memindahkan uang. Bila aset baru dibeli setelah aplikasi digunakan, transaksi pembelian dan pengakuan aset belum terintegrasi penuh; jangan menganggap laporan kekayaan sudah menjadi buku besar akuntansi.
 
-## Roadmap ringkas
-1. Fondasi ledger lokal: workspace, akun, transaksi, anggaran, dashboard, dan tes aturan nominal.
-2. Aset, kewajiban, tujuan tabungan, dan rekonsiliasi.
-3. Buku besar double-entry, chart of accounts, jurnal, dan laporan akuntansi.
-4. Penjualan, pembelian, pelanggan, pemasok, persediaan, cabang, dan proyek.
-5. Pajak, dokumen, impor/ekspor, analisis, OCR lokal, dan otomatisasi.
-6. Keamanan, backup/restore terenkripsi, audit, performa, dan uji perangkat nyata.
+## Status fitur lanjutan
 
-Setiap tahap harus melewati build, unit test, pengujian database, pengujian alur UI, serta pemeriksaan integritas data sebelum dinyatakan selesai.
+Modul berikut **belum tersedia sebagai fungsi lengkap** dan tidak boleh dianggap aktif hanya karena masuk daftar kebutuhan produk:
+- Rekonsiliasi akun, penyesuaian saldo terkontrol, edit transaksi umum, transaksi berulang/terjadwal/massal, template, lampiran struk, impor/ekspor.
+- Target dengan jadwal setoran otomatis dan notifikasi.
+- Riwayat nilai aset terstruktur, penyusutan, pemeliharaan, pembelian/penjualan/penghapusan aset yang terhubung dengan jurnal.
+- Piutang, bunga/denda terstruktur, cicilan otomatis, pengingat jatuh tempo.
+- Chart of Accounts, jurnal double-entry, buku besar, buku pembantu, neraca saldo, neraca, laba rugi, laporan arus kas akuntansi, periode akuntansi.
+- ERP multi-perusahaan/cabang/departemen/cost center/proyek, penjualan, pembelian, invoice, pelanggan, pemasok, produk, stok, gudang, dan HPP.
+- Manajemen portofolio investasi lengkap, harga pasar otomatis, pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/CSV/DOCX.
+- Analisis tren/prediksi, grafik lanjutan, OCR lokal, asisten bahasa sehari-hari.
+- Multi-user, role/permission, approval berjenjang, PIN, biometrik, enkripsi database, backup/restore terenkripsi, checksum, dan enkripsi lampiran.
+- Personalisasi lengkap, mode pemula/mahir, multi-mata uang, konsolidasi enterprise.
+
+Lihat [docs/FEATURE-STATUS.md](docs/FEATURE-STATUS.md) untuk matriks implementasi dan gerbang penerimaan.
+
+## Build
+
+Memerlukan JDK 17, Android SDK Platform 36, Build Tools 36.0.0, dan Gradle 8.13.
+
+```bash
+gradle :app:testDebugUnitTest
+gradle :app:assembleDebug
+gradle :app:assembleRelease
+```
+
+CI di GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama `Duit-0.2.0.apk`.
+
+## Signing dan distribusi
+
+Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian internal. APK ini dapat dipasang untuk pengujian, tetapi **belum ditandatangani dengan kunci rilis privat** untuk distribusi komersial/pembaruan jangka panjang. Sebelum distribusi, buat keystore rilis, simpan kredensialnya sebagai secret CI, dan konfigurasi signing release. Jangan pernah commit keystore atau password ke repository.
+
+## Database dan kompatibilitas
+
+Database Room saat ini berada pada versi 2 dengan migrasi eksplisit dari versi 1. Jangan gunakan destructive migration pada data pengguna. Sebelum penggunaan produksi, jalankan tes upgrade database dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Fitur backup/restore belum tersedia pada 0.2.0.
+
+## Pengujian yang telah dilakukan
+
+CI versi 0.2.0 telah lulus `testDebugUnitTest` dan `assembleRelease`. Pengujian instalasi/upgrade dan alur UI pada perangkat Android fisik belum dilakukan dalam CI. Keberhasilan build bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai.
