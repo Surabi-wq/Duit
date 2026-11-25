@@ -1,5 +1,7 @@
 package com.surabi.duit.data
 
+import java.util.Calendar
+
 data class FinanceAlert(
     val title: String,
     val message: String,
@@ -13,6 +15,19 @@ enum class FinanceAlertSeverity { CRITICAL, WARNING }
  * it never mutates balances, budgets, transactions, or due dates.
  */
 object FinanceAlertEngine {
+    private fun isOverdue(dueAt: Long?, now: Long): Boolean {
+        if (dueAt == null) return false
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = now
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        // A due date is considered late only after that calendar day has ended.
+        return dueAt < calendar.timeInMillis
+    }
+
     fun evaluate(
         accounts: List<AccountBalanceRow>,
         budgets: List<BudgetOverviewRow>,
@@ -64,7 +79,7 @@ object FinanceAlertEngine {
             )
         }
 
-        liabilities.filter { it.outstandingMinor > 0L && it.dueAt != null && it.dueAt < now }
+        liabilities.filter { it.outstandingMinor > 0L && it.dueAt != null && isOverdue(it.dueAt, now) }
             .forEach { debt ->
                 alerts += FinanceAlert(
                     "Utang melewati jatuh tempo",
