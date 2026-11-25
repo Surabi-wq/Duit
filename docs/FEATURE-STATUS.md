@@ -1,6 +1,6 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.6.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **0.7.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -8,6 +8,7 @@ Versi source saat ini: **0.6.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Dashboard workspace dengan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
+- Batas saldo minimum dapat diatur per akun; nilai 0 menonaktifkan peringatan. Perubahan dibatasi pada akun di workspace yang sama dan dicatat pada audit log.
 - Akun dapat berupa tunai, bank, tabungan, e-wallet, kartu kredit, investasi, atau lainnya.
 
 ### Transaksi dan kontrol data
@@ -47,11 +48,11 @@ Versi source saat ini: **0.6.0**. Repositori dikembangkan sebagai aplikasi Andro
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
 - Database versi 3 dengan migrasi eksplisit versi 1→2 dan 2→3; tidak memakai destructive migration.
-- Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, dan pembatalan transaksi.
+- Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, perubahan batas saldo minimum akun, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
-- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, serta escaping dan perlindungan formula pada CSV.
+- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, validasi nominal batas saldo minimum, serta escaping dan perlindungan formula pada CSV.
 
-## Aturan akuntansi penting pada versi 0.6.0
+## Aturan akuntansi penting pada versi 0.7.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.

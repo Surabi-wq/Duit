@@ -154,6 +154,28 @@ class FinanceRepository(private val database: FinanceDatabase) {
         )
     }
 
+    suspend fun setAccountMinimumBalance(workspaceId: Long, accountId: Long, minimumBalance: Long) {
+        require(minimumBalance >= 0L) { "Batas saldo minimum tidak boleh negatif." }
+
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            val account = dao.getAccount(accountId, workspaceId)
+                ?: throw IllegalArgumentException("Akun tidak ditemukan pada workspace ini.")
+            val updated = dao.updateAccountMinimumBalance(accountId, workspaceId, minimumBalance)
+            check(updated == 1) { "Batas saldo minimum gagal diperbarui." }
+            dao.insertAuditLog(
+                AuditLogEntity(
+                    workspaceId = workspaceId,
+                    entityType = "ACCOUNT",
+                    entityId = accountId,
+                    action = "MINIMUM_BALANCE_UPDATE",
+                    description = "Batas saldo minimum akun ${account.name} diubah menjadi ${minimumBalance} rupiah.",
+                    createdAt = now
+                )
+            )
+        }
+    }
+
     suspend fun createTransaction(
         workspaceId: Long,
         type: String,

@@ -198,6 +198,7 @@ fun WealthScreen(
     receivables: List<ReceivableOverviewRow>,
     liabilities: List<LiabilityOverviewRow>,
     onAddAccount: () -> Unit,
+    onSetAccountMinimumBalance: (AccountBalanceRow) -> Unit,
     onAddAsset: () -> Unit,
     onAddReceivable: () -> Unit,
     onCollectReceivable: (ReceivableOverviewRow) -> Unit,
@@ -237,11 +238,32 @@ fun WealthScreen(
         accounts.forEach { account ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(account.name, fontWeight = FontWeight.SemiBold)
                         Text(account.type.replace('_', ' '), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            if (account.minimumBalanceMinor > 0L) {
+                                "Batas minimum: ${financeRupiah(account.minimumBalanceMinor)}"
+                            } else {
+                                "Peringatan batas minimum: tidak aktif"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (account.minimumBalanceMinor > 0L && account.balanceMinor < account.minimumBalanceMinor) {
+                            Text(
+                                "Saldo berada di bawah batas minimum",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
                     }
-                    Text(financeRupiah(account.balanceMinor), fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(financeRupiah(account.balanceMinor), fontWeight = FontWeight.Bold)
+                        TextButton(onClick = { onSetAccountMinimumBalance(account) }) {
+                            Text("Atur batas")
+                        }
+                    }
                 }
             }
         }

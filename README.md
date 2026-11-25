@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **0.6.0**
+- Versi: **0.7.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -19,6 +19,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 ### Workspace, akun, dan dashboard
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun per workspace: tunai, bank, tabungan, e-wallet, kartu kredit, investasi, dan lainnya.
+- Batas saldo minimum dapat diatur per akun; perubahan tersimpan pada audit log dan tidak mengubah saldo maupun histori transaksi.
 - Saldo akun dihitung dari saldo awal serta transaksi; bukan angka saldo manual yang dapat tertinggal dari histori.
 - Dashboard workspace menampilkan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, aktivitas transaksi terbaru, dan peringatan berbasis aturan lokal.
 - Peringatan mencakup saldo negatif, saldo di bawah batas minimum, anggaran hampir habis/terlampaui, arus kas negatif, serta utang/piutang yang melewati jatuh tempo.
@@ -89,7 +90,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.6.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.7.0.apk**.
 
 ## Signing dan distribusi
 
@@ -97,7 +98,7 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.6.0.
+Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.7.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 
