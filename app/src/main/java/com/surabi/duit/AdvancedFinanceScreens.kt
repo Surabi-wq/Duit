@@ -664,7 +664,7 @@ private fun FinanceChoicePicker(label: String, selected: String, options: List<P
 
 private fun parseFinanceDate(input: String): Long? {
     val value = input.trim()
-    if (!Regex("""\\d{2}-\\d{2}-\\d{4}""").matches(value)) return null
+    if (!Regex("""\d{2}-\d{2}-\d{4}""").matches(value)) return null
     val formatter = java.text.SimpleDateFormat("dd-MM-yyyy", Locale("id", "ID")).apply {
         isLenient = false
     }
