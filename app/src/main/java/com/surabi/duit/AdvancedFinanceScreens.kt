@@ -97,17 +97,17 @@ fun PlanningScreen(
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             DuitMetricCard(
-                label = "Dana target terkumpul",
-                value = financeRupiah(savedTotal),
+                label = "Total sasaran",
+                value = financeRupiah(targetTotal),
                 modifier = Modifier.weight(1f),
-                accent = MaterialTheme.colorScheme.primary,
+                accent = MaterialTheme.colorScheme.secondary,
                 supporting = "${goals.size} target aktif"
             )
             DuitMetricCard(
-                label = "Realisasi anggaran",
-                value = financeRupiah(spentTotal),
+                label = if (remainingBudget >= 0L) "Sisa anggaran" else "Lebih anggaran",
+                value = financeRupiah(kotlin.math.abs(remainingBudget)),
                 modifier = Modifier.weight(1f),
-                accent = if (remainingBudget < 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+                accent = if (remainingBudget < 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                 supporting = "${budgets.size} anggaran"
             )
         }
@@ -230,9 +230,6 @@ private fun GoalProgressCard(
                     color = if (remaining == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium
                 )
-                Spacer(Modifier.weight(1f))
-                Text("Sisa ${financeRupiah(remaining)}", fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             goal.targetDate?.let {
                 Text("Tanggal target: ${financeDate(it)}", style = MaterialTheme.typography.labelSmall,
