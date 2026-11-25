@@ -659,135 +659,242 @@ private fun DashboardScreen(
     accounts: List<AccountBalanceRow>,
     transactions: List<TransactionEntity>,
     budgets: List<BudgetOverviewRow>,
+    goals: List<GoalOverviewRow>,
     income: Long,
     expenses: Long,
     netWorth: Long,
     liabilities: List<LiabilityOverviewRow>,
     receivables: List<ReceivableOverviewRow>,
-    onAddTransaction: () -> Unit
+    period: DashboardPeriod,
+    onPeriodChange: (DashboardPeriod) -> Unit,
+    onAddTransaction: () -> Unit,
+    onAddGoal: () -> Unit,
+    onOpenPlanning: () -> Unit,
+    onOpenWealth: () -> Unit
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
+    val netCashflow = income - expenses
     val alerts = remember(accounts, budgets, liabilities, receivables, income, expenses) {
         FinanceAlertEngine.evaluate(accounts, budgets, liabilities, receivables, income, expenses, System.currentTimeMillis())
     }
-    val netCashflow = income - expenses
+    val dueRows = remember(liabilities, receivables) {
+        (liabilities.filter { it.outstandingMinor > 0L && it.dueAt != null }.map {
+            Triple("Utang", it.name, it.dueAt!!)
+        } + receivables.filter { it.outstandingMinor > 0L && it.dueAt != null }.map {
+            Triple("Piutang", it.name, it.dueAt!!)
+        }).sortedBy { it.third }.take(4)
+    }
+
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Ringkasan keuangan", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(workspaceName + " • Bulan ini", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        DuitPageHeader(
+            title = "Ringkasan keuangan",
+            subtitle = "$workspaceName • kondisi keuangan aktual",
+            trailing = {
+                ChoiceDropdown(
+                    label = "Periode",
+                    selected = period.name,
+                    options = listOf(
+                        DashboardPeriod.THIS_MONTH.name to "Bulan ini",
+                        DashboardPeriod.LAST_30_DAYS.name to "30 hari",
+                        DashboardPeriod.THIS_YEAR.name to "Tahun ini"
+                    ),
+                    onSelected = { value ->
+                        runCatching { DashboardPeriod.valueOf(value) }.getOrNull()?.let(onPeriodChange)
+                    }
+                )
+            }
+        )
+
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(22.dp),
+            shape = RoundedCornerShape(20.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Total saldo akun", color = Color.White.copy(alpha = 0.82f))
+                Text("Total saldo akun", color = Color.White.copy(alpha = 0.84f), style = MaterialTheme.typography.labelLarge)
                 Text(
                     formatRupiah(totalBalance),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(accounts.size.toString() + " akun aktif", color = Color.White.copy(alpha = 0.82f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("${accounts.size} akun aktif", color = Color.White.copy(alpha = 0.84f), style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = onOpenWealth) {
+                        Text("Rincian akun", color = Color.White)
+                    }
+                }
             }
         }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Estimasi kekayaan bersih terdata", color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text(formatRupiah(netWorth), style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                Text("Saldo akun + dana target + aset non-tunai − sisa utang",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            }
+
+        DuitPanel {
+            DuitSectionHeader("Kekayaan bersih saat ini", "Estimasi dari data akun dan aset yang tercatat")
+            Text(formatRupiah(netWorth), style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Text("Saldo akun + dana target + aset non-tunai + piutang − sisa utang",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            MetricCard(
-                title = "Pemasukan",
+            DuitMetricCard(
+                label = "Pemasukan • ${DashboardPeriodResolver.label(period)}",
                 value = formatRupiah(income),
-                icon = Icons.Filled.ArrowDownward,
-                accent = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                accent = MaterialTheme.colorScheme.primary
             )
-            MetricCard(
-                title = "Pengeluaran",
+            DuitMetricCard(
+                label = "Pengeluaran • ${DashboardPeriodResolver.label(period)}",
                 value = formatRupiah(expenses),
-                icon = Icons.Filled.ArrowUpward,
-                accent = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                accent = MaterialTheme.colorScheme.error
             )
         }
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("Arus kas bulan ini", fontWeight = FontWeight.SemiBold)
-                Text(
-                    formatRupiah(netCashflow),
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = if (netCashflow >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    fontWeight = FontWeight.Bold
-                )
-                CashflowBar(income = income, expenses = expenses)
-                Text(
-                    "Transfer antar-akun tidak dihitung sebagai pemasukan atau pengeluaran.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+
+        DuitPanel {
+            DuitSectionHeader("Arus kas", "Berdasarkan transaksi pada periode terpilih")
+            Text(
+                formatRupiah(netCashflow),
+                style = MaterialTheme.typography.headlineSmall,
+                color = if (netCashflow >= 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                fontWeight = FontWeight.Bold
+            )
+            CashflowBar(income = income, expenses = expenses)
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text("Masuk ${formatRupiah(income)}", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                Text("Keluar ${formatRupiah(expenses)}", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+            }
+            Text(
+                "Transfer antar-akun tidak dihitung sebagai pemasukan atau pengeluaran.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (accounts.isNotEmpty()) {
+            DuitSectionHeader("Rincian saldo akun", "Saldo tersedia pada workspace aktif") {
+                TextButton(onClick = onOpenWealth) { Text("Lihat semua") }
+            }
+            accounts.take(3).forEach { account ->
+                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(account.name, fontWeight = FontWeight.SemiBold)
+                            Text(account.type.replace('_', ' '), style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Text(formatRupiah(account.balanceMinor), fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
+
         if (alerts.isNotEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("Peringatan keuangan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    alerts.take(5).forEach { alert ->
-                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Icon(
-                                imageVector = if (alert.severity == FinanceAlertSeverity.CRITICAL) Icons.Filled.Info else Icons.Filled.ExpandMore,
-                                contentDescription = null,
-                                tint = if (alert.severity == FinanceAlertSeverity.CRITICAL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
-                            )
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(alert.title, fontWeight = FontWeight.SemiBold)
-                                Text(alert.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+            DuitPanel {
+                DuitSectionHeader("Peringatan keuangan", "Pemeriksaan berbasis aturan dari data lokal")
+                alerts.take(5).forEach { alert ->
+                    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(
+                            imageVector = if (alert.severity == FinanceAlertSeverity.CRITICAL) Icons.Filled.Info else Icons.Filled.ExpandMore,
+                            contentDescription = if (alert.severity == FinanceAlertSeverity.CRITICAL) "Peringatan kritis" else "Peringatan",
+                            tint = if (alert.severity == FinanceAlertSeverity.CRITICAL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(alert.title, fontWeight = FontWeight.SemiBold)
+                            Text(alert.message, style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Anggaran berjalan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            Text(budgets.size.toString() + " anggaran", color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        DuitSectionHeader("Anggaran", "Realisasi dari pengeluaran yang tersimpan") {
+            TextButton(onClick = onOpenPlanning) { Text("Kelola") }
         }
         if (budgets.isEmpty()) {
-            EmptyHint(
+            DuitEmptyState(
                 title = "Belum ada anggaran",
-                body = "Buat batas pengeluaran bulanan agar realisasi lebih mudah dipantau."
+                message = "Buat batas pengeluaran untuk memantau realisasi dan dana yang tersisa.",
+                icon = Icons.Filled.PieChart,
+                action = { Button(onClick = onOpenPlanning) { Text("Buka perencanaan") } }
             )
         } else {
             budgets.take(3).forEach { BudgetProgressCard(it) }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Text("Transaksi terbaru", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            Text(transactions.size.toString() + " tercatat", color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        DuitSectionHeader("Target tabungan", "Progres sasaran keuangan") {
+            TextButton(onClick = onOpenPlanning) { Text("Lihat semua") }
         }
-        if (transactions.isEmpty()) {
-            EmptyHint(
-                title = "Belum ada transaksi",
-                body = "Gunakan tombol tambah untuk mencatat pemasukan, pengeluaran, atau transfer pertama."
+        if (goals.isEmpty()) {
+            DuitEmptyState(
+                title = "Belum ada target",
+                message = "Tentukan sasaran untuk dana darurat, pendidikan, atau kebutuhan lain.",
+                icon = Icons.Filled.Savings,
+                action = { OutlinedButton(onClick = onAddGoal) { Text("Buat target") } }
             )
-            Button(onClick = onAddTransaction, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Catat transaksi")
+        } else {
+            goals.take(3).forEach { goal ->
+                val progress = if (goal.targetMinor > 0L) {
+                    (goal.savedMinor.toDouble() / goal.targetMinor.toDouble()).coerceIn(0.0, 1.0).toFloat()
+                } else 0f
+                DuitPanel {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(goal.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text("${(progress * 100).toInt()}%", color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold)
+                    }
+                    LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                    Text("${formatRupiah(goal.savedMinor)} terkumpul dari ${formatRupiah(goal.targetMinor)}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
+        }
+
+        if (dueRows.isNotEmpty()) {
+            DuitSectionHeader("Jatuh tempo yang tercatat", "Tanggal berasal dari data utang dan piutang")
+            DuitPanel {
+                dueRows.forEach { (kind, title, dueAt) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(kind, style = MaterialTheme.typography.labelMedium,
+                            color = if (kind == "Utang") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
+                        Spacer(Modifier.width(8.dp))
+                        Text(title, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
+                        Text(SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(Date(dueAt)),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+
+        DuitSectionHeader("Transaksi terbaru", "Aktivitas terkini pada workspace aktif")
+        if (transactions.isEmpty()) {
+            DuitEmptyState(
+                title = "Belum ada transaksi",
+                message = "Pemasukan, pengeluaran, dan transfer yang disimpan akan muncul di sini.",
+                icon = Icons.Filled.ReceiptLong,
+                action = { Button(onClick = onAddTransaction) { Text("Catat transaksi pertama") } }
+            )
         } else {
             transactions.take(5).forEach { TransactionCard(it) }
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Button(onClick = onAddTransaction, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Transaksi")
+            }
+            OutlinedButton(onClick = onAddGoal, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Filled.Savings, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text("Target")
+            }
         }
         Spacer(Modifier.height(72.dp))
     }
