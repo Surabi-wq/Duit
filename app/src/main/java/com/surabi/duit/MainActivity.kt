@@ -8,7 +8,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Savings
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.ui.res.painterResource
 import com.surabi.duit.data.DashboardPeriod
@@ -106,6 +105,7 @@ import com.surabi.duit.data.TransactionCsvExporter
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -676,8 +676,11 @@ private fun DashboardScreen(
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
     val netCashflow = income - expenses
-    val alerts = remember(accounts, budgets, liabilities, receivables, income, expenses) {
-        FinanceAlertEngine.evaluate(accounts, budgets, liabilities, receivables, income, expenses, System.currentTimeMillis())
+    val alerts = remember(accounts, budgets, liabilities, receivables, income, expenses, period) {
+        FinanceAlertEngine.evaluate(
+            accounts, budgets, liabilities, receivables, income, expenses, System.currentTimeMillis(),
+            periodLabel = DashboardPeriodResolver.label(period).lowercase(Locale("id", "ID"))
+        )
     }
     val dueRows = remember(liabilities, receivables) {
         (liabilities.filter { it.outstandingMinor > 0L && it.dueAt != null }.map {
@@ -967,6 +970,7 @@ private fun TransactionsScreen(
     val accountNames = accounts.associate { it.id to it.name }
     val categoryNames = categories.associate { it.id to it.name }
     var searchQuery by remember(workspaceId) { mutableStateOf("") }
+    var appliedSearchQuery by remember(workspaceId) { mutableStateOf("") }
     var typeFilter by remember(workspaceId) { mutableStateOf("ALL") }
     var showAdvancedFilters by remember(workspaceId) { mutableStateOf(false) }
     var startDateText by remember(workspaceId) { mutableStateOf("") }
@@ -979,6 +983,11 @@ private fun TransactionsScreen(
     var selectedToVoid by remember { mutableStateOf<TransactionEntity?>(null) }
     var selectedDetails by remember { mutableStateOf<TransactionEntity?>(null) }
     var voidReason by remember { mutableStateOf("") }
+
+    LaunchedEffect(workspaceId, searchQuery) {
+        delay(250)
+        appliedSearchQuery = searchQuery
+    }
 
     val dateBounds = remember(startDateText, endDateText) {
         TransactionDateRange.parse(startDateText, endDateText)
@@ -994,7 +1003,7 @@ private fun TransactionsScreen(
         else -> null
     }
     val visible by remember(
-        workspaceId, searchQuery, typeFilter, dateBounds, accountFilterId,
+        workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
         categoryFilterId, minAmount, maxAmount, sortOrder, filterError
     ) {
         if (filterError != null) {
@@ -1002,7 +1011,7 @@ private fun TransactionsScreen(
         } else {
             repository.searchTransactions(
                 workspaceId = workspaceId,
-                query = searchQuery,
+                query = appliedSearchQuery,
                 type = typeFilter,
                 startAt = dateBounds!!.startAt,
                 endAt = dateBounds!!.endAt,
@@ -1014,8 +1023,12 @@ private fun TransactionsScreen(
             )
         }
     }.collectAsState(initial = emptyList())
-    val groupedTransactions = remember(visible) {
-        visible.groupBy { transactionDayStart(it.occurredAt) }
+    val groupedTransactions = remember(visible, sortOrder) {
+        if (sortOrder == "AMOUNT_ASC" || sortOrder == "AMOUNT_DESC") {
+            mapOf(Long.MIN_VALUE to visible)
+        } else {
+            visible.groupBy { transactionDayStart(it.occurredAt) }
+        }
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -1165,13 +1178,20 @@ private fun TransactionsScreen(
         if (filterError != null) {
             DuitEmptyState(title = "Filter belum valid", message = filterError, icon = Icons.Filled.Info)
         } else if (visible.isEmpty()) {
-            DuitEmptyState(
-                title = if (!hasTransactions) "Belum ada transaksi" else "Transaksi tidak ditemukan",
-                message = if (!hasTransactions) "Transaksi yang Anda simpan akan muncul di halaman ini."
-                    else "Ubah kata pencarian atau kurangi filter untuk melihat hasil lain.",
-                icon = Icons.Filled.ReceiptLong,
-                action = if (!hasTransactions) ({ Button(onClick = onAdd) { Text("Catat transaksi") } }) else null
-            )
+            if (!hasTransactions) {
+                DuitEmptyState(
+                    title = "Belum ada transaksi",
+                    message = "Transaksi yang Anda simpan akan muncul di halaman ini.",
+                    icon = Icons.Filled.ReceiptLong,
+                    action = { Button(onClick = onAdd) { Text("Catat transaksi") } }
+                )
+            } else {
+                DuitEmptyState(
+                    title = "Transaksi tidak ditemukan",
+                    message = "Ubah kata pencarian atau kurangi filter untuk melihat hasil lain.",
+                    icon = Icons.Filled.ReceiptLong
+                )
+            }
         } else {
             Text(
                 "Dikelompokkan berdasarkan tanggal • hingga 500 hasil terbaru yang cocok",
@@ -1185,7 +1205,7 @@ private fun TransactionsScreen(
                 groupedTransactions.forEach { (day, rows) ->
                     item(key = "transaction-day-$day") {
                         Text(
-                            transactionDayLabel(day),
+                            if (day == Long.MIN_VALUE) "Urutan berdasarkan nominal" else transactionDayLabel(day),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
