@@ -5,6 +5,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.ui.res.painterResource
+import com.surabi.duit.data.DashboardPeriod
+import com.surabi.duit.data.DashboardPeriodResolver
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -163,6 +171,8 @@ private fun DuitApp(repository: FinanceRepository) {
     val workspaces by repository.workspaces.collectAsState(initial = emptyList())
     var selectedWorkspaceId by remember { mutableLongStateOf(0L) }
     var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
+    var showQuickActions by remember { mutableStateOf(false) }
+    var dashboardPeriod by remember { mutableStateOf(DashboardPeriod.THIS_MONTH) }
     var showWorkspaceDialog by remember { mutableStateOf(false) }
     var showTransactionDialog by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
@@ -195,12 +205,12 @@ private fun DuitApp(repository: FinanceRepository) {
     val liabilities by remember(workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
     val receivables by remember(workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
 
-    val month = remember { currentMonthBounds() }
-    val income by remember(workspaceId, month.first, month.second) {
-        repository.income(workspaceId, month.first, month.second)
+    val dashboardRange = remember(dashboardPeriod) { DashboardPeriodResolver.bounds(dashboardPeriod) }
+    val income by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
+        repository.income(workspaceId, dashboardRange.startAt, dashboardRange.endAt)
     }.collectAsState(initial = 0L)
-    val expenses by remember(workspaceId, month.first, month.second) {
-        repository.expenses(workspaceId, month.first, month.second)
+    val expenses by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
+        repository.expenses(workspaceId, dashboardRange.startAt, dashboardRange.endAt)
     }.collectAsState(initial = 0L)
     val netWorth = accounts.sumOf { it.balanceMinor } +
         goals.sumOf { it.savedMinor } +
@@ -212,11 +222,22 @@ private fun DuitApp(repository: FinanceRepository) {
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Duit", fontWeight = FontWeight.Bold)
-                        Text(selectedWorkspace?.name ?: "Memuat ruang keuangan…",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_duit_logo),
+                            contentDescription = "Logo Duit",
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(34.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                            Text("Duit", fontWeight = FontWeight.Bold)
+                            Text(
+                                selectedWorkspace?.name ?: "Menyiapkan ruang keuangan…",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -228,24 +249,70 @@ private fun DuitApp(repository: FinanceRepository) {
             )
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 4.dp
+            ) {
                 AppTab.entries.forEach { tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
                         icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) }
+                        label = { Text(tab.label) },
+                        alwaysShowLabel = true,
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
         },
         floatingActionButton = {
-            if (selectedTab == AppTab.DASHBOARD || selectedTab == AppTab.TRANSACTIONS) {
+            Box {
                 FloatingActionButton(
-                    onClick = { showTransactionDialog = true },
+                    onClick = { showQuickActions = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
-                ) { Icon(Icons.Filled.Add, contentDescription = "Tambah transaksi") }
+                ) { Icon(Icons.Filled.Add, contentDescription = "Buka tindakan cepat") }
+                DropdownMenu(expanded = showQuickActions, onDismissRequest = { showQuickActions = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Catat transaksi") },
+                        leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
+                        onClick = { showQuickActions = false; showTransactionDialog = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Tambah akun") },
+                        leadingIcon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
+                        onClick = { showQuickActions = false; showAccountDialog = true; selectedTab = AppTab.ACCOUNTS }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Buat anggaran") },
+                        leadingIcon = { Icon(Icons.Filled.PieChart, contentDescription = null) },
+                        onClick = { showQuickActions = false; showBudgetDialog = true; selectedTab = AppTab.BUDGETS }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Buat target tabungan") },
+                        leadingIcon = { Icon(Icons.Filled.Savings, contentDescription = null) },
+                        onClick = { showQuickActions = false; showGoalDialog = true; selectedTab = AppTab.BUDGETS }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Catat aset") },
+                        leadingIcon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                        onClick = { showQuickActions = false; showAssetDialog = true; selectedTab = AppTab.ACCOUNTS }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Catat piutang") },
+                        onClick = { showQuickActions = false; showReceivableDialog = true; selectedTab = AppTab.ACCOUNTS }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Catat utang") },
+                        onClick = { showQuickActions = false; showLiabilityDialog = true; selectedTab = AppTab.ACCOUNTS }
+                    )
+                }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -260,12 +327,18 @@ private fun DuitApp(repository: FinanceRepository) {
                     accounts = accounts,
                     transactions = transactions,
                     budgets = budgets,
+                    goals = goals,
                     income = income,
                     expenses = expenses,
                     netWorth = netWorth,
                     liabilities = liabilities,
                     receivables = receivables,
-                    onAddTransaction = { showTransactionDialog = true }
+                    period = dashboardPeriod,
+                    onPeriodChange = { dashboardPeriod = it },
+                    onAddTransaction = { showTransactionDialog = true },
+                    onAddGoal = { showGoalDialog = true },
+                    onOpenPlanning = { selectedTab = AppTab.BUDGETS },
+                    onOpenWealth = { selectedTab = AppTab.ACCOUNTS }
                 )
                 AppTab.TRANSACTIONS -> TransactionsScreen(
                     workspaceId = workspaceId,
@@ -313,7 +386,7 @@ private fun DuitApp(repository: FinanceRepository) {
                     onPayLiability = { selectedLiabilityPayment = it },
                     onUpdateAsset = { selectedAssetForValue = it }
                 )
-                AppTab.GUIDE -> GuideScreen()
+                AppTab.GUIDE -> GuideScreen(onNavigate = { selectedTab = it })
             }
         }
     }
