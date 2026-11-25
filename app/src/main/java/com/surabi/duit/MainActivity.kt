@@ -75,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.surabi.duit.data.AccountBalanceRow
+import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
 import com.surabi.duit.data.FinanceDatabase
@@ -136,6 +137,7 @@ private fun DuitApp(repository: FinanceRepository) {
     var showLiabilityDialog by remember { mutableStateOf(false) }
     var selectedGoalMovement by remember { mutableStateOf<Pair<GoalOverviewRow, Boolean>?>(null) }
     var selectedLiabilityPayment by remember { mutableStateOf<LiabilityOverviewRow?>(null) }
+    var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
 
     LaunchedEffect(Unit) { repository.ensureDefaults() }
     LaunchedEffect(workspaces) {
@@ -250,7 +252,8 @@ private fun DuitApp(repository: FinanceRepository) {
                     onAddAccount = { showAccountDialog = true },
                     onAddAsset = { showAssetDialog = true },
                     onAddLiability = { showLiabilityDialog = true },
-                    onPayLiability = { selectedLiabilityPayment = it }
+                    onPayLiability = { selectedLiabilityPayment = it },
+                    onUpdateAsset = { selectedAssetForValue = it }
                 )
                 AppTab.GUIDE -> GuideScreen()
             }
@@ -389,6 +392,23 @@ private fun DuitApp(repository: FinanceRepository) {
                         showLiabilityDialog = false
                         snackbar.showSnackbar("Utang berhasil dicatat.")
                     }.onFailure { snackbar.showSnackbar(it.message ?: "Utang gagal dicatat.") }
+                }
+            }
+        )
+    }
+
+    selectedAssetForValue?.let { asset ->
+        AssetValueDialog(
+            asset = asset,
+            onDismiss = { selectedAssetForValue = null },
+            onSave = { currentValue ->
+                scope.launch {
+                    runCatching { repository.updateAssetValue(workspaceId, asset.id, currentValue) }
+                        .onSuccess {
+                            selectedAssetForValue = null
+                            snackbar.showSnackbar("Nilai aset berhasil diperbarui.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Pembaruan nilai aset gagal.") }
                 }
             }
         )
