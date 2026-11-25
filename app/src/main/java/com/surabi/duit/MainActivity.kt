@@ -111,8 +111,8 @@ private enum class AppTab(
 ) {
     DASHBOARD("Ringkas", Icons.Filled.Home),
     TRANSACTIONS("Transaksi", Icons.Filled.ReceiptLong),
-    BUDGETS("Anggaran", Icons.Filled.PieChart),
-    ACCOUNTS("Akun", Icons.Filled.AccountBalanceWallet),
+    BUDGETS("Rencana", Icons.Filled.PieChart),
+    ACCOUNTS("Aset", Icons.Filled.AccountBalanceWallet),
     GUIDE("Panduan", Icons.Filled.Info)
 }
 
@@ -128,10 +128,13 @@ private fun DuitApp(repository: FinanceRepository) {
     var showTransactionDialog by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
     var showBudgetDialog by remember { mutableStateOf(false) }
+    var showGoalDialog by remember { mutableStateOf(false) }
+    var showAssetDialog by remember { mutableStateOf(false) }
+    var showLiabilityDialog by remember { mutableStateOf(false) }
+    var selectedGoalMovement by remember { mutableStateOf<Pair<GoalOverviewRow, Boolean>?>(null) }
+    var selectedLiabilityPayment by remember { mutableStateOf<LiabilityOverviewRow?>(null) }
 
-    LaunchedEffect(Unit) {
-        repository.ensureDefaults()
-    }
+    LaunchedEffect(Unit) { repository.ensureDefaults() }
     LaunchedEffect(workspaces) {
         if (workspaces.isNotEmpty() && workspaces.none { it.id == selectedWorkspaceId }) {
             selectedWorkspaceId = workspaces.first().id
@@ -140,18 +143,13 @@ private fun DuitApp(repository: FinanceRepository) {
 
     val workspaceId = selectedWorkspaceId
     val selectedWorkspace = workspaces.firstOrNull { it.id == workspaceId }
-    val accounts by remember(workspaceId) {
-        repository.accounts(workspaceId)
-    }.collectAsState(initial = emptyList())
-    val categories by remember(workspaceId) {
-        repository.categories(workspaceId)
-    }.collectAsState(initial = emptyList())
-    val transactions by remember(workspaceId) {
-        repository.transactions(workspaceId)
-    }.collectAsState(initial = emptyList())
-    val budgets by remember(workspaceId) {
-        repository.budgets(workspaceId)
-    }.collectAsState(initial = emptyList())
+    val accounts by remember(workspaceId) { repository.accounts(workspaceId) }.collectAsState(initial = emptyList())
+    val categories by remember(workspaceId) { repository.categories(workspaceId) }.collectAsState(initial = emptyList())
+    val transactions by remember(workspaceId) { repository.transactions(workspaceId) }.collectAsState(initial = emptyList())
+    val budgets by remember(workspaceId) { repository.budgets(workspaceId) }.collectAsState(initial = emptyList())
+    val goals by remember(workspaceId) { repository.goals(workspaceId) }.collectAsState(initial = emptyList())
+    val assets by remember(workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
+    val liabilities by remember(workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
 
     val month = remember { currentMonthBounds() }
     val income by remember(workspaceId, month.first, month.second) {
@@ -160,6 +158,10 @@ private fun DuitApp(repository: FinanceRepository) {
     val expenses by remember(workspaceId, month.first, month.second) {
         repository.expenses(workspaceId, month.first, month.second)
     }.collectAsState(initial = 0L)
+    val netWorth = accounts.sumOf { it.balanceMinor } +
+        goals.sumOf { it.savedMinor } +
+        assets.sumOf { it.currentValueMinor } -
+        liabilities.sumOf { it.outstandingMinor }
 
     Scaffold(
         topBar = {
@@ -167,19 +169,13 @@ private fun DuitApp(repository: FinanceRepository) {
                 title = {
                     Column {
                         Text("Duit", fontWeight = FontWeight.Bold)
-                        Text(
-                            selectedWorkspace?.name ?: "Memuat ruang keuangan…",
+                        Text(selectedWorkspace?.name ?: "Memuat ruang keuangan…",
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 actions = {
-                    WorkspacePicker(
-                        workspaces = workspaces,
-                        selectedId = workspaceId,
-                        onSelected = { selectedWorkspaceId = it }
-                    )
+                    WorkspacePicker(workspaces, workspaceId) { selectedWorkspaceId = it }
                     IconButton(onClick = { showWorkspaceDialog = true }) {
                         Icon(Icons.Filled.Add, contentDescription = "Tambah workspace")
                     }
@@ -204,9 +200,7 @@ private fun DuitApp(repository: FinanceRepository) {
                     onClick = { showTransactionDialog = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Tambah transaksi")
-                }
+                ) { Icon(Icons.Filled.Add, contentDescription = "Tambah transaksi") }
             }
         },
         snackbarHost = { SnackbarHost(snackbar) }
@@ -223,21 +217,37 @@ private fun DuitApp(repository: FinanceRepository) {
                     budgets = budgets,
                     income = income,
                     expenses = expenses,
+                    netWorth = netWorth,
                     onAddTransaction = { showTransactionDialog = true }
                 )
                 AppTab.TRANSACTIONS -> TransactionsScreen(
                     transactions = transactions,
                     accounts = accounts,
                     categories = categories,
-                    onAdd = { showTransactionDialog = true }
+                    onAdd = { showTransactionDialog = true },
+                    onVoid = { id, reason ->
+                        scope.launch {
+                            runCatching { repository.voidTransaction(workspaceId, id, reason) }
+                                .onSuccess { snackbar.showSnackbar("Transaksi dibatalkan dan tercatat pada audit trail.") }
+                                .onFailure { snackbar.showSnackbar(it.message ?: "Pembatalan gagal.") }
+                        }
+                    }
                 )
-                AppTab.BUDGETS -> BudgetsScreen(
+                AppTab.BUDGETS -> PlanningScreen(
                     budgets = budgets,
-                    onAdd = { showBudgetDialog = true }
+                    goals = goals,
+                    onAddBudget = { showBudgetDialog = true },
+                    onAddGoal = { showGoalDialog = true },
+                    onMoveGoal = { goal, isWithdrawal -> selectedGoalMovement = goal to isWithdrawal }
                 )
-                AppTab.ACCOUNTS -> AccountsScreen(
+                AppTab.ACCOUNTS -> WealthScreen(
                     accounts = accounts,
-                    onAdd = { showAccountDialog = true }
+                    assets = assets,
+                    liabilities = liabilities,
+                    onAddAccount = { showAccountDialog = true },
+                    onAddAsset = { showAssetDialog = true },
+                    onAddLiability = { showLiabilityDialog = true },
+                    onPayLiability = { selectedLiabilityPayment = it }
                 )
                 AppTab.GUIDE -> GuideScreen()
             }
@@ -255,9 +265,7 @@ private fun DuitApp(repository: FinanceRepository) {
                             showWorkspaceDialog = false
                             snackbar.showSnackbar("Workspace berhasil dibuat.")
                         }
-                        .onFailure {
-                            snackbar.showSnackbar(it.message ?: "Workspace gagal dibuat.")
-                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Workspace gagal dibuat.") }
                 }
             }
         )
@@ -271,22 +279,11 @@ private fun DuitApp(repository: FinanceRepository) {
             onSave = { type, amount, title, fromId, toId, categoryId, note ->
                 scope.launch {
                     runCatching {
-                        repository.createTransaction(
-                            workspaceId = workspaceId,
-                            type = type,
-                            amount = amount,
-                            title = title,
-                            fromAccountId = fromId,
-                            toAccountId = toId,
-                            categoryId = categoryId,
-                            note = note
-                        )
+                        repository.createTransaction(workspaceId, type, amount, title, fromId, toId, categoryId, note)
                     }.onSuccess {
                         showTransactionDialog = false
                         snackbar.showSnackbar("Transaksi berhasil disimpan.")
-                    }.onFailure {
-                        snackbar.showSnackbar(it.message ?: "Transaksi gagal disimpan.")
-                    }
+                    }.onFailure { snackbar.showSnackbar(it.message ?: "Transaksi gagal disimpan.") }
                 }
             }
         )
@@ -297,14 +294,12 @@ private fun DuitApp(repository: FinanceRepository) {
             onDismiss = { showAccountDialog = false },
             onSave = { name, type, opening ->
                 scope.launch {
-                    runCatching {
-                        repository.createAccount(workspaceId, name, type, opening)
-                    }.onSuccess {
-                        showAccountDialog = false
-                        snackbar.showSnackbar("Akun berhasil ditambahkan.")
-                    }.onFailure {
-                        snackbar.showSnackbar(it.message ?: "Akun gagal ditambahkan.")
-                    }
+                    runCatching { repository.createAccount(workspaceId, name, type, opening) }
+                        .onSuccess {
+                            showAccountDialog = false
+                            snackbar.showSnackbar("Akun berhasil ditambahkan.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Akun gagal ditambahkan.") }
                 }
             }
         )
@@ -316,14 +311,99 @@ private fun DuitApp(repository: FinanceRepository) {
             onDismiss = { showBudgetDialog = false },
             onSave = { name, limit, categoryId ->
                 scope.launch {
+                    runCatching { repository.createMonthlyBudget(workspaceId, name, limit, categoryId) }
+                        .onSuccess {
+                            showBudgetDialog = false
+                            snackbar.showSnackbar("Anggaran bulanan berhasil dibuat.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Anggaran gagal dibuat.") }
+                }
+            }
+        )
+    }
+
+    if (showGoalDialog) {
+        SavingsGoalDialog(
+            onDismiss = { showGoalDialog = false },
+            onSave = { name, target, priority ->
+                scope.launch {
+                    runCatching { repository.createSavingsGoal(workspaceId, name, target, null, priority) }
+                        .onSuccess {
+                            showGoalDialog = false
+                            snackbar.showSnackbar("Target tabungan berhasil dibuat.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Target gagal dibuat.") }
+                }
+            }
+        )
+    }
+
+    selectedGoalMovement?.let { (goal, isWithdrawal) ->
+        GoalMovementDialog(
+            goals = goals,
+            accounts = accounts,
+            initialGoalId = goal.id,
+            isWithdrawal = isWithdrawal,
+            onDismiss = { selectedGoalMovement = null },
+            onSave = { goalId, accountId, amount, note ->
+                scope.launch {
+                    runCatching { repository.moveGoalFunds(workspaceId, goalId, accountId, amount, isWithdrawal, note) }
+                        .onSuccess {
+                            selectedGoalMovement = null
+                            snackbar.showSnackbar(if (isWithdrawal) "Dana target berhasil ditarik." else "Setoran target berhasil dicatat.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Perubahan target gagal.") }
+                }
+            }
+        )
+    }
+
+    if (showAssetDialog) {
+        AssetDialog(
+            onDismiss = { showAssetDialog = false },
+            onSave = { name, category, cost, value, notes ->
+                scope.launch {
+                    runCatching { repository.createAsset(workspaceId, name, category, cost, value, notes) }
+                        .onSuccess {
+                            showAssetDialog = false
+                            snackbar.showSnackbar("Aset berhasil dicatat.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Aset gagal disimpan.") }
+                }
+            }
+        )
+    }
+
+    if (showLiabilityDialog) {
+        LiabilityDialog(
+            accounts = accounts,
+            onDismiss = { showLiabilityDialog = false },
+            onSave = { name, counterparty, amount, dueAt, receivingAccount, notes ->
+                scope.launch {
                     runCatching {
-                        repository.createMonthlyBudget(workspaceId, name, limit, categoryId)
+                        repository.createLiability(workspaceId, name, counterparty, amount, dueAt, receivingAccount, notes)
                     }.onSuccess {
-                        showBudgetDialog = false
-                        snackbar.showSnackbar("Anggaran bulanan berhasil dibuat.")
-                    }.onFailure {
-                        snackbar.showSnackbar(it.message ?: "Anggaran gagal dibuat.")
-                    }
+                        showLiabilityDialog = false
+                        snackbar.showSnackbar("Utang berhasil dicatat.")
+                    }.onFailure { snackbar.showSnackbar(it.message ?: "Utang gagal dicatat.") }
+                }
+            }
+        )
+    }
+
+    selectedLiabilityPayment?.let { liability ->
+        LiabilityPaymentDialog(
+            liability = liability,
+            accounts = accounts,
+            onDismiss = { selectedLiabilityPayment = null },
+            onSave = { accountId, amount, note ->
+                scope.launch {
+                    runCatching { repository.payLiability(workspaceId, liability.id, accountId, amount, note) }
+                        .onSuccess {
+                            selectedLiabilityPayment = null
+                            snackbar.showSnackbar("Pembayaran utang berhasil dicatat.")
+                        }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Pembayaran utang gagal.") }
                 }
             }
         )
