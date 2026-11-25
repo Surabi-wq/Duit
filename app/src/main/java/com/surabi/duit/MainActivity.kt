@@ -265,6 +265,7 @@ private fun DuitApp(repository: FinanceRepository) {
                 AppTab.TRANSACTIONS -> TransactionsScreen(
                     workspaceId = workspaceId,
                     repository = repository,
+                    hasTransactions = transactions.isNotEmpty(),
                     accounts = accounts,
                     categories = categories,
                     onAdd = { showTransactionDialog = true },
@@ -743,6 +744,7 @@ private fun CashflowBar(income: Long, expenses: Long) {
 private fun TransactionsScreen(
     workspaceId: Long,
     repository: FinanceRepository,
+    hasTransactions: Boolean,
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
     onAdd: () -> Unit,
@@ -801,8 +803,8 @@ private fun TransactionsScreen(
         Spacer(Modifier.height(8.dp))
         if (visible.isEmpty()) {
             EmptyHint(
-                title = if (transactions.isEmpty()) "Belum ada transaksi" else "Transaksi tidak ditemukan",
-                body = if (transactions.isEmpty()) "Transaksi yang Anda simpan akan muncul di halaman ini."
+                title = if (!hasTransactions) "Belum ada transaksi" else "Transaksi tidak ditemukan",
+                body = if (!hasTransactions) "Transaksi yang Anda simpan akan muncul di halaman ini."
                     else "Ubah kata pencarian atau filter jenis transaksi."
             )
         } else {
