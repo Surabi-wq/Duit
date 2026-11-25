@@ -1,6 +1,6 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **0.9.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -66,6 +66,17 @@ Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Unit test tambahan memeriksa batas periode dashboard lokal dan akhir hari inklusif.
 - Tidak ada perubahan skema database atau rumus saldo/kekayaan bersih pada pembaruan UI ini.
 
+## Penyegaran visual UI/UX — 0.9.0
+
+- Palet hijau-biru dibuat lebih tegas dengan background abu-abu kebiruan yang sangat muda, surface putih, serta status merah/oranye/biru/hijau yang konsisten.
+- Tipografi diperkuat untuk judul, saldo, nilai metrik, dan label; komponen mengikuti radius 12–26 dp dan ritme spacing 4/8 dp.
+- Dashboard memiliki kartu saldo utama bergradasi, ringkasan kekayaan bersih, kartu pemasukan/pengeluaran beraksen, dan dua progress bar arus kas yang memakai nominal aktual pada periode terpilih.
+- Pemilih periode ditampilkan sebagai chip yang terlihat langsung; rincian akun memakai ikon, warna lembut, dan batas kartu yang konsisten.
+- Modul perencanaan dan kekayaan bersih menggunakan komponen hero yang sama; kartu target, anggaran, aset, piutang, utang, transaksi, dan empty state diperkuat dengan border/elevasi/tint.
+- Logo launcher dan identitas aplikasi disegarkan tanpa mengubah nama paket.
+- Tidak ada perubahan skema Room, query saldo, atau rumus kekayaan bersih. Tidak ada data dummy.
+- Grafik tren waktu dan pengaturan widget belum diimplementasikan karena membutuhkan query seri waktu serta preferensi persisten; tidak disimulasikan dengan data buatan.
+
 ## Temuan audit UI/UX dan status penanganan
 
 **Keparahan tinggi**
@@ -82,7 +93,7 @@ Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
 - Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menjadi koordinator layar dan dialog yang besar.
 
-## Aturan akuntansi penting pada versi 0.8.0
+## Aturan akuntansi penting pada versi 0.9.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.

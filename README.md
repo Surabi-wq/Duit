@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **0.8.0**
+- Versi: **0.9.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -13,6 +13,14 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Penyimpanan: Room di atas SQLite
 - Database Room: versi 3
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
+
+## Penyegaran visual UI/UX versi 0.9.0
+
+- Hero saldo bergradasi hijau-biru, identitas merek dan ikon launcher yang diperbarui.
+- Latar aplikasi dibuat lebih terang; kartu metrik memakai aksen warna semantik, batas halus, dan hierarki tipografi yang lebih tegas.
+- Dashboard menampilkan pilihan periode sebagai chip, saldo akun, kekayaan bersih, pemasukan/pengeluaran, arus kas dengan dua indikator terpisah, saldo per akun, peringatan, anggaran, target, jatuh tempo, dan transaksi terbaru.
+- Kartu transaksi, target, anggaran, aset, piutang, dan kewajiban menggunakan radius, border, elevasi, dan warna status yang konsisten.
+- Tidak ada angka contoh yang ditambahkan. Visual ringkasan tetap berdasarkan data Room lokal. Grafik tren harian belum ditambahkan karena query historis terstruktur untuk rentang tersebut belum tersedia; tidak menggunakan data sintetis.
 
 ## Fitur yang sudah memiliki alur kerja nyata
 
@@ -105,7 +113,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.8.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.9.0.apk**.
 
 ## Signing dan distribusi
 

@@ -1,5 +1,6 @@
 package com.surabi.duit
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.foundation.layout.Arrangement
@@ -185,7 +186,13 @@ private fun GoalProgressCard(
 ) {
     val progress = (goal.savedMinor.toDouble() / goal.targetMinor.toDouble()).coerceIn(0.0, 1.0).toFloat()
     val remaining = (goal.targetMinor - goal.savedMinor).coerceAtLeast(0L)
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.Icon(Icons.Filled.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -232,7 +239,13 @@ private fun GoalProgressCard(
 private fun BudgetProgressCardAdvanced(budget: BudgetOverviewRow) {
     val ratio = if (budget.limitMinor > 0L) budget.spentMinor.toDouble() / budget.limitMinor.toDouble() else 0.0
     val remaining = budget.limitMinor - budget.spentMinor
-    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(budget.name, fontWeight = FontWeight.SemiBold)
             Text(
@@ -296,20 +309,11 @@ fun WealthScreen(
             title = "Aset dan kewajiban",
             subtitle = "Saldo, kekayaan bersih, serta komitmen keuangan"
         )
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Estimasi kekayaan bersih terdata", style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(financeRupiah(netWorth), style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Saldo akun + dana target + aset non-tunai + piutang − utang",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-        }
+        DuitBalanceHero(
+            title = "KEKAYAAN BERSIH TERDATA",
+            value = financeRupiah(netWorth),
+            supporting = "Estimasi dari seluruh data workspace"
+        )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 DuitMetricCard("Saldo akun", financeRupiah(accountTotal), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
@@ -347,7 +351,13 @@ fun WealthScreen(
                     )
                 }
                 accounts.forEach { account ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
                         Row(
                             Modifier.padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -390,7 +400,13 @@ fun WealthScreen(
                     )
                 }
                 assets.forEach { asset ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(asset.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -424,7 +440,13 @@ fun WealthScreen(
                     )
                 }
                 receivables.forEach { receivable ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(receivable.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -463,7 +485,13 @@ fun WealthScreen(
                     )
                 }
                 liabilities.forEach { debt ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+                    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
                         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(debt.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))

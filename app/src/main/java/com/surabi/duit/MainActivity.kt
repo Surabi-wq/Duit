@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Savings
@@ -54,6 +55,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -72,6 +75,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -236,6 +240,7 @@ private fun DuitApp(repository: FinanceRepository) {
     Scaffold(
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(
@@ -245,7 +250,7 @@ private fun DuitApp(repository: FinanceRepository) {
                             modifier = Modifier.size(34.dp)
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text("Duit", fontWeight = FontWeight.Bold)
+                            Text("Duit", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                             Text(
                                 selectedWorkspace?.name ?: "Menyiapkan ruang keuangan…",
                                 style = MaterialTheme.typography.labelSmall,
@@ -266,7 +271,7 @@ private fun DuitApp(repository: FinanceRepository) {
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 4.dp
+                tonalElevation = 8.dp
             ) {
                 AppTab.entries.forEach { tab ->
                     NavigationBarItem(
@@ -288,11 +293,13 @@ private fun DuitApp(repository: FinanceRepository) {
         },
         floatingActionButton = {
             Box {
-                FloatingActionButton(
+                ExtendedFloatingActionButton(
                     onClick = { showQuickActions = true },
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) { Icon(Icons.Filled.Add, contentDescription = "Buka tindakan cepat") }
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text("Tambah") }
+                )
                 DropdownMenu(expanded = showQuickActions, onDismissRequest = { showQuickActions = false }) {
                     DropdownMenuItem(
                         text = { Text("Catat transaksi") },
@@ -672,7 +679,7 @@ private fun WorkspacePicker(
     var expanded by remember { mutableStateOf(false) }
     val current = workspaces.firstOrNull { it.id == selectedId }
     Box {
-        TextButton(onClick = { expanded = true }) {
+        FilledTonalButton(onClick = { expanded = true }) {
             Text(current?.name ?: "Pilih", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 108.dp))
             Icon(Icons.Filled.ExpandMore, contentDescription = "Buka daftar workspace")
         }
@@ -698,22 +705,21 @@ private fun DashboardPeriodPicker(
     period: DashboardPeriod,
     onSelected: (DashboardPeriod) -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        OutlinedButton(onClick = { expanded = true }) {
-            Text(DashboardPeriodResolver.label(period), maxLines = 1)
-            Icon(Icons.Filled.ExpandMore, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DashboardPeriod.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(DashboardPeriodResolver.label(option)) },
-                    onClick = {
-                        onSelected(option)
-                        expanded = false
-                    }
-                )
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        DashboardPeriod.entries.forEach { option ->
+            val label = when (option) {
+                DashboardPeriod.THIS_MONTH -> "Bulan ini"
+                DashboardPeriod.LAST_30_DAYS -> "30 hari"
+                DashboardPeriod.THIS_YEAR -> "Tahun ini"
             }
+            FilterChip(
+                selected = period == option,
+                onClick = { onSelected(option) },
+                label = { Text(label) }
+            )
         }
     }
 }
@@ -754,65 +760,50 @@ private fun DashboardScreen(
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(17.dp)
     ) {
         DuitPageHeader(
             title = "Ringkasan keuangan",
-            subtitle = "$workspaceName • kondisi keuangan aktual",
-            trailing = {
-                DashboardPeriodPicker(period = period, onSelected = onPeriodChange)
-            }
+            subtitle = "$workspaceName • kondisi keuangan aktual"
+        )
+        DashboardPeriodPicker(period = period, onSelected = onPeriodChange)
+
+        DuitBalanceHero(
+            title = "TOTAL SALDO AKUN",
+            value = formatRupiah(totalBalance),
+            supporting = "${accounts.size} akun aktif",
+            detailLabel = "Rincian akun",
+            onDetail = onOpenWealth
         )
 
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-            shape = RoundedCornerShape(20.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Total saldo akun", color = Color.White.copy(alpha = 0.84f), style = MaterialTheme.typography.labelLarge)
-                Text(
-                    formatRupiah(totalBalance),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${accounts.size} akun aktif", color = Color.White.copy(alpha = 0.84f), style = MaterialTheme.typography.bodySmall)
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onOpenWealth) {
-                        Text("Rincian akun", color = Color.White)
-                    }
-                }
-            }
-        }
-
-        DuitPanel {
-            DuitSectionHeader("Kekayaan bersih saat ini", "Estimasi dari data akun dan aset yang tercatat")
-            Text(formatRupiah(netWorth), style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Text("Saldo akun + dana target + aset non-tunai + piutang − sisa utang",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        DuitMetricCard(
+            label = "Kekayaan bersih terdata",
+            value = formatRupiah(netWorth),
+            modifier = Modifier.fillMaxWidth(),
+            accent = MaterialTheme.colorScheme.secondary,
+            supporting = "Akun + dana target + aset + piutang − sisa utang"
+        )
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             DuitMetricCard(
-                label = "Pemasukan • ${DashboardPeriodResolver.label(period)}",
+                label = "Pemasukan",
                 value = formatRupiah(income),
                 modifier = Modifier.weight(1f),
-                accent = MaterialTheme.colorScheme.primary
+                accent = MaterialTheme.colorScheme.primary,
+                supporting = DashboardPeriodResolver.label(period)
             )
             DuitMetricCard(
-                label = "Pengeluaran • ${DashboardPeriodResolver.label(period)}",
+                label = "Pengeluaran",
                 value = formatRupiah(expenses),
                 modifier = Modifier.weight(1f),
-                accent = MaterialTheme.colorScheme.error
+                accent = MaterialTheme.colorScheme.error,
+                supporting = DashboardPeriodResolver.label(period)
             )
         }
 
         DuitPanel {
-            DuitSectionHeader("Arus kas", "Berdasarkan transaksi pada periode terpilih")
+            DuitSectionHeader("Arus kas", "Perbandingan uang masuk dan uang keluar")
             Text(
                 formatRupiah(netCashflow),
                 style = MaterialTheme.typography.headlineSmall,
@@ -820,12 +811,6 @@ private fun DashboardScreen(
                 fontWeight = FontWeight.Bold
             )
             CashflowBar(income = income, expenses = expenses)
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("Masuk ${formatRupiah(income)}", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-                Text("Keluar ${formatRupiah(expenses)}", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
-            }
             Text(
                 "Transfer antar-akun tidak dihitung sebagai pemasukan atau pengeluaran.",
                 style = MaterialTheme.typography.bodySmall,
@@ -838,17 +823,41 @@ private fun DashboardScreen(
                 TextButton(onClick = onOpenWealth) { Text("Lihat semua") }
             }
             accounts.take(3).forEach { account ->
-                Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp)) {
-                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Row(
+                        Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            Modifier.size(42.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(14.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(account.name, fontWeight = FontWeight.SemiBold)
                             Text(account.type.replace('_', ' '), style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Text(formatRupiah(account.balanceMinor), fontWeight = FontWeight.SemiBold)
+                        Text(formatRupiah(account.balanceMinor), fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
+        } else {
+            DuitEmptyState(
+                title = "Belum ada akun",
+                message = "Tambahkan dompet atau rekening agar saldo dan transaksi dapat mulai dicatat.",
+                icon = Icons.Filled.AccountBalanceWallet
+            )
         }
 
         if (alerts.isNotEmpty()) {
@@ -861,7 +870,7 @@ private fun DashboardScreen(
                             contentDescription = if (alert.severity == FinanceAlertSeverity.CRITICAL) "Peringatan kritis" else "Peringatan",
                             tint = if (alert.severity == FinanceAlertSeverity.CRITICAL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
                         )
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(alert.title, fontWeight = FontWeight.SemiBold)
                             Text(alert.message, style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -904,7 +913,7 @@ private fun DashboardScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(goal.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                         Text("${(progress * 100).toInt()}%", color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold)
+                            fontWeight = FontWeight.Bold)
                     }
                     LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                     Text("${formatRupiah(goal.savedMinor)} terkumpul dari ${formatRupiah(goal.targetMinor)}",
@@ -941,19 +950,19 @@ private fun DashboardScreen(
             transactions.take(5).forEach { TransactionCard(it) }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
             Button(onClick = onAddTransaction, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("Transaksi")
+                Text("Catat transaksi")
             }
             OutlinedButton(onClick = onAddGoal, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Savings, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text("Target")
+                Text("Buat target")
             }
         }
-        Spacer(Modifier.height(72.dp))
+        Spacer(Modifier.height(36.dp))
     }
 }
 
@@ -976,35 +985,37 @@ private fun MetricCard(
 
 @Composable
 private fun CashflowBar(income: Long, expenses: Long) {
-    val total = (income + expenses).coerceAtLeast(1L).toFloat()
-    Row(
-        modifier = Modifier.fillMaxWidth().height(12.dp).background(
-            MaterialTheme.colorScheme.surfaceVariant,
-            RoundedCornerShape(20.dp)
+    val maxValue = maxOf(income, expenses, 1L).toDouble()
+    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        CashflowTrack(
+            label = "Pemasukan",
+            amount = income,
+            fraction = (income / maxValue).toFloat().coerceIn(0f, 1f),
+            color = MaterialTheme.colorScheme.primary
         )
-    ) {
-        Box(
-            Modifier.weight((income.toFloat() / total).coerceAtLeast(0.001f))
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
-        )
-        Box(
-            Modifier.weight((expenses.toFloat() / total).coerceAtLeast(0.001f))
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(20.dp))
+        CashflowTrack(
+            label = "Pengeluaran",
+            amount = expenses,
+            fraction = (expenses / maxValue).toFloat().coerceIn(0f, 1f),
+            color = MaterialTheme.colorScheme.error
         )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+}
+
+@Composable
+private fun CashflowTrack(label: String, amount: Long, fraction: Float, color: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)))
-            Spacer(Modifier.width(5.dp))
-            Text("Masuk", style = MaterialTheme.typography.labelSmall)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.weight(1f))
+            Text(formatRupiah(amount), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
         }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(50)))
-            Spacer(Modifier.width(5.dp))
-            Text("Keluar", style = MaterialTheme.typography.labelSmall)
-        }
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth().height(9.dp),
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     }
 }
 
@@ -1342,7 +1353,10 @@ private fun TransactionCard(
         modifier = Modifier.fillMaxWidth().then(
             if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
         ),
-        shape = RoundedCornerShape(14.dp)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
