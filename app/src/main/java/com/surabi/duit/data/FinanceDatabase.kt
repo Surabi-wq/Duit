@@ -109,6 +109,12 @@ data class CategoryEntity(
             parentColumns = ["id"],
             childColumns = ["liabilityId"],
             onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = ReceivableEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["receivableId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ],
     indices = [
@@ -117,7 +123,8 @@ data class CategoryEntity(
         Index("toAccountId"),
         Index("categoryId"),
         Index("goalId"),
-        Index("liabilityId")
+        Index("liabilityId"),
+        Index("receivableId")
     ]
 )
 data class TransactionEntity(
@@ -134,7 +141,8 @@ data class TransactionEntity(
     val createdAt: Long,
     val isVoided: Boolean = false,
     val goalId: Long? = null,
-    val liabilityId: Long? = null
+    val liabilityId: Long? = null,
+    val receivableId: Long? = null
 )
 
 @Entity(
@@ -257,6 +265,24 @@ data class AuditLogEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0
 )
 
+@Entity(
+    tableName = "receivables",
+    foreignKeys = [
+        ForeignKey(entity = WorkspaceEntity::class, parentColumns = ["id"], childColumns = ["workspaceId"], onDelete = ForeignKey.CASCADE)
+    ],
+    indices = [Index("workspaceId"), Index("dueAt")]
+)
+data class ReceivableEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: Long,
+    val name: String,
+    val counterparty: String,
+    val originalAmountMinor: Long,
+    val dueAt: Long?,
+    val notes: String = "",
+    val createdAt: Long
+)
+
 data class GoalOverviewRow(
     val id: Long,
     val workspaceId: Long,
@@ -276,6 +302,16 @@ data class LiabilityOverviewRow(
     val outstandingMinor: Long,
     val dueAt: Long?,
     val isClosed: Boolean
+)
+
+data class ReceivableOverviewRow(
+    val id: Long,
+    val workspaceId: Long,
+    val name: String,
+    val counterparty: String,
+    val originalAmountMinor: Long,
+    val outstandingMinor: Long,
+    val dueAt: Long?
 )
 
 @Dao
@@ -316,6 +352,7 @@ interface FinanceDao {
                     WHEN t.type = 'GOAL_WITHDRAWAL' AND t.fromAccountId = a.id THEN t.amountMinor
                     WHEN t.type = 'LIABILITY_PAYMENT' AND t.fromAccountId = a.id THEN -t.amountMinor
                     WHEN t.type = 'LIABILITY_RECEIVED' AND t.fromAccountId = a.id THEN t.amountMinor
+                    WHEN t.type = 'RECEIVABLE_COLLECTION' AND t.fromAccountId = a.id THEN t.amountMinor
                     ELSE 0
                 END
             ), 0) AS balanceMinor
@@ -438,6 +475,40 @@ interface FinanceDao {
     """)
     suspend fun liabilityOutstanding(liabilityId: Long, workspaceId: Long): Long?
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertReceivable(receivable: ReceivableEntity): Long
+
+    @Query("SELECT * FROM receivables WHERE id = :receivableId AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun getReceivable(receivableId: Long, workspaceId: Long): ReceivableEntity?
+
+    @Query("""
+        SELECT r.id AS id, r.workspaceId AS workspaceId, r.name AS name,
+               r.counterparty AS counterparty, r.originalAmountMinor AS originalAmountMinor,
+               MAX(0, r.originalAmountMinor - COALESCE(SUM(
+                   CASE WHEN t.type = 'RECEIVABLE_COLLECTION' AND t.isVoided = 0
+                        THEN t.amountMinor ELSE 0 END
+               ), 0)) AS outstandingMinor,
+               r.dueAt AS dueAt
+        FROM receivables r
+        LEFT JOIN transactions t ON t.receivableId = r.id AND t.workspaceId = r.workspaceId
+        WHERE r.workspaceId = :workspaceId
+        GROUP BY r.id
+        ORDER BY CASE WHEN r.dueAt IS NULL THEN 1 ELSE 0 END, r.dueAt ASC, r.createdAt DESC
+    """)
+    fun observeReceivables(workspaceId: Long): Flow<List<ReceivableOverviewRow>>
+
+    @Query("""
+        SELECT MAX(0, r.originalAmountMinor - COALESCE(SUM(
+            CASE WHEN t.type = 'RECEIVABLE_COLLECTION' AND t.isVoided = 0
+                 THEN t.amountMinor ELSE 0 END
+        ), 0))
+        FROM receivables r
+        LEFT JOIN transactions t ON t.receivableId = r.id AND t.workspaceId = r.workspaceId
+        WHERE r.id = :receivableId AND r.workspaceId = :workspaceId
+        GROUP BY r.id
+    """)
+    suspend fun receivableOutstanding(receivableId: Long, workspaceId: Long): Long?
+
     @Query("SELECT * FROM transactions WHERE id = :transactionId AND workspaceId = :workspaceId LIMIT 1")
     suspend fun getTransaction(transactionId: Long, workspaceId: Long): TransactionEntity?
 
@@ -501,9 +572,10 @@ interface FinanceDao {
         SavingsGoalEntity::class,
         AssetEntity::class,
         LiabilityEntity::class,
+        ReceivableEntity::class,
         AuditLogEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -578,6 +650,28 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS receivables (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        workspaceId INTEGER NOT NULL,
+                        name TEXT NOT NULL,
+                        counterparty TEXT NOT NULL,
+                        originalAmountMinor INTEGER NOT NULL,
+                        dueAt INTEGER,
+                        notes TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_receivables_workspaceId ON receivables(workspaceId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_receivables_dueAt ON receivables(dueAt)")
+                database.execSQL("ALTER TABLE transactions ADD COLUMN receivableId INTEGER REFERENCES receivables(id) ON DELETE SET NULL")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_receivableId ON transactions(receivableId)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: FinanceDatabase? = null
 
@@ -587,7 +681,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "duit-local.db"
-                ).addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
         }
     }
