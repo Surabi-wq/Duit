@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -1470,45 +1471,135 @@ private fun BudgetProgressCard(budget: BudgetOverviewRow) {
     }
 }
 
+private data class GuideEntry(
+    val category: String,
+    val title: String,
+    val body: String,
+    val destination: AppTab,
+    val action: String
+)
+
 @Composable
-private fun GuideScreen() {
+private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val entries = remember {
+        listOf(
+            GuideEntry("Mulai", "Pisahkan ruang keuangan",
+                "Buat workspace Pribadi, Keluarga, Bisnis, Perusahaan, atau Proyek. Transaksi, akun, dan anggaran disimpan per workspace.",
+                AppTab.DASHBOARD, "Buka Ringkasan"),
+            GuideEntry("Akun", "Tambahkan dompet dan rekening",
+                "Tambahkan saldo awal akun. Saldo berikutnya dihitung dari transaksi masuk, keluar, dan transfer yang sudah tersimpan.",
+                AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Transaksi", "Catat pemasukan dan pengeluaran",
+                "Pilih jenis transaksi, nominal, keterangan, akun, serta kategori yang sesuai. Simpan setelah memeriksa rincian.",
+                AppTab.TRANSACTIONS, "Buka Transaksi"),
+            GuideEntry("Transaksi", "Pahami transfer antar-akun",
+                "Transfer mengurangi akun sumber dan menambah akun tujuan. Transfer tidak dianggap pendapatan atau biaya.",
+                AppTab.TRANSACTIONS, "Buka Transaksi"),
+            GuideEntry("Transaksi", "Cari dan ekspor transaksi",
+                "Gunakan pencarian dan filter tanggal, akun, kategori, nominal, serta jenis. CSV mengekspor hasil yang sedang tampil, maksimal 500 transaksi; bukan backup database.",
+                AppTab.TRANSACTIONS, "Buka Transaksi"),
+            GuideEntry("Perencanaan", "Buat anggaran",
+                "Anggaran membandingkan batas dengan transaksi pengeluaran yang cocok. Realisasi dan sisa dihitung dari transaksi tersimpan.",
+                AppTab.BUDGETS, "Buka Rencana"),
+            GuideEntry("Perencanaan", "Kelola target tabungan",
+                "Setoran memindahkan saldo dari akun ke dana target. Penarikan mengembalikannya. Progres diturunkan dari riwayat pergerakan dana.",
+                AppTab.BUDGETS, "Buka Rencana"),
+            GuideEntry("Aset", "Catat nilai aset non-tunai",
+                "Catat kendaraan, properti, tanah, emas, elektronik, atau peralatan. Jangan catat ulang saldo rekening/dompet di modul aset.",
+                AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Aset", "Kelola utang dan piutang",
+                "Pembayaran utang mengurangi saldo akun dan kewajiban. Piutang menambah saldo akun hanya ketika penerimaan benar-benar dicatat.",
+                AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Keamanan", "Penyimpanan offline dan cadangan",
+                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV bukan pengganti backup.",
+                AppTab.GUIDE, "Tetap di Panduan")
+        )
+    }
+    val filtered = remember(query, entries) {
+        val term = query.trim()
+        if (term.isEmpty()) entries else entries.filter {
+            it.title.contains(term, ignoreCase = true) ||
+                it.body.contains(term, ignoreCase = true) ||
+                it.category.contains(term, ignoreCase = true)
+        }
+    }
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Panduan Duit", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        GuideCard("1. Pisahkan keuangan", "Buat workspace untuk Pribadi, Keluarga, Bisnis, atau Proyek. Data transaksi dan anggaran tiap workspace tidak dicampur.")
-        GuideCard("2. Tambahkan akun", "Buat dompet tunai, rekening bank, tabungan, atau e-wallet. Saldo awal menjadi titik awal perhitungan saldo. Dari kartu akun pada tab Aset, atur batas saldo minimum agar dashboard memberi peringatan saat saldo turun di bawah batas.")
-        GuideCard("3. Catat transaksi", "Pilih pemasukan, pengeluaran, atau transfer. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.")
-        GuideCard("4. Pantau anggaran", "Buat batas pengeluaran bulanan. Realisasi anggaran dihitung dari transaksi pengeluaran yang tersimpan.")
-        GuideCard("5. Saring transaksi", "Di halaman Transaksi, cari keterangan atau catatan, lalu gunakan Filter lanjutan untuk menyaring tanggal, akun, kategori, nominal minimum/maksimum, dan urutan hasil. Tanggal akhir mencakup seluruh hari yang dipilih.")
-        GuideCard("6. Ekspor CSV", "Ekspor CSV menyimpan hasil pencarian dan filter yang sedang tampil, maksimal 500 transaksi terbaru. Ekspor CSV bukan backup penuh database.")
-        GuideCard("Penyimpanan dan privasi", "Data inti disimpan lokal pada perangkat menggunakan Room/SQLite. Alur utama tidak memerlukan internet. Backup dan restore mandiri terenkripsi belum tersedia, sehingga pengguna perlu menjaga data perangkat dan tidak menganggap ekspor CSV sebagai cadangan penuh database.")
-        GuideCard("Fitur tahap berikutnya", "Jurnal akuntansi double-entry, rekonsiliasi, transaksi berulang, lampiran struk, impor file, ekspor PDF/Excel/DOCX, ERP, persediaan, investasi lengkap, pajak, OCR, analisis prediktif, multi-pengguna, enkripsi database, dan backup/restore masih dalam pengembangan.")
+        DuitPageHeader(
+            title = "Pusat bantuan",
+            subtitle = "Panduan cepat, istilah, dan pemecahan masalah Duit"
+        )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it.take(100) },
+            label = { Text("Cari topik, contoh, atau istilah") },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Cari panduan") },
+            trailingIcon = {
+                if (query.isNotBlank()) {
+                    IconButton(onClick = { query = "" }) {
+                        Icon(Icons.Filled.Clear, contentDescription = "Hapus pencarian")
+                    }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (filtered.isEmpty()) {
+            DuitEmptyState(
+                title = "Panduan tidak ditemukan",
+                message = "Coba kata lain seperti transaksi, anggaran, target, akun, utang, atau CSV.",
+                icon = Icons.Filled.Search
+            )
+        } else {
+            filtered.groupBy { it.category }.forEach { (category, topics) ->
+                DuitSectionHeader(category, "${topics.size} topik bantuan")
+                topics.forEach { entry ->
+                    DuitPanel {
+                        Text(entry.title, fontWeight = FontWeight.SemiBold)
+                        Text(entry.body, style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(
+                            onClick = { onNavigate(entry.destination) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text(entry.action) }
+                    }
+                }
+            }
+        }
+
+        DuitSectionHeader("Pertanyaan yang sering muncul")
+        GuideCard(
+            "Mengapa saldo berbeda dari pemasukan dikurangi pengeluaran?",
+            "Saldo akun juga dipengaruhi saldo awal, transfer, setoran/penarikan target, pencairan pinjaman, pembayaran utang, dan penerimaan piutang. Beberapa aliran tersebut bukan pendapatan atau biaya."
+        )
+        GuideCard(
+            "Apakah ekspor CSV mencadangkan seluruh aplikasi?",
+            "Tidak. CSV hanya menyalin hasil transaksi yang sedang tampil, maksimal 500 baris. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
+        )
+        GuideCard(
+            "Apakah semua fitur enterprise sudah tersedia?",
+            "Belum. Akuntansi double-entry, buku besar, rekonsiliasi, impor spreadsheet, ERP, inventaris, OCR, enkripsi database, multi-user, dan backup/restore masih menjadi pekerjaan lanjutan."
+        )
+        Spacer(Modifier.height(24.dp))
     }
 }
 
 @Composable
 private fun GuideCard(title: String, body: String) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        }
+    DuitPanel {
+        Text(title, fontWeight = FontWeight.SemiBold)
+        Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
 @Composable
 private fun EmptyHint(title: String, body: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(title, fontWeight = FontWeight.SemiBold)
-            Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-        }
-    }
+    DuitEmptyState(title = title, message = body)
 }
 
 @Composable
