@@ -55,6 +55,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -248,7 +250,7 @@ private fun DuitApp(repository: FinanceRepository) {
                             modifier = Modifier.size(34.dp)
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text("Duit", fontWeight = FontWeight.Bold)
+                            Text("Duit", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                             Text(
                                 selectedWorkspace?.name ?: "Menyiapkan ruang keuangan…",
                                 style = MaterialTheme.typography.labelSmall,
@@ -269,7 +271,7 @@ private fun DuitApp(repository: FinanceRepository) {
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 4.dp
+                tonalElevation = 8.dp
             ) {
                 AppTab.entries.forEach { tab ->
                     NavigationBarItem(
@@ -291,11 +293,13 @@ private fun DuitApp(repository: FinanceRepository) {
         },
         floatingActionButton = {
             Box {
-                FloatingActionButton(
+                ExtendedFloatingActionButton(
                     onClick = { showQuickActions = true },
                     containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) { Icon(Icons.Filled.Add, contentDescription = "Buka tindakan cepat") }
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text("Tambah") }
+                )
                 DropdownMenu(expanded = showQuickActions, onDismissRequest = { showQuickActions = false }) {
                     DropdownMenuItem(
                         text = { Text("Catat transaksi") },
@@ -675,7 +679,7 @@ private fun WorkspacePicker(
     var expanded by remember { mutableStateOf(false) }
     val current = workspaces.firstOrNull { it.id == selectedId }
     Box {
-        TextButton(onClick = { expanded = true }) {
+        FilledTonalButton(onClick = { expanded = true }) {
             Text(current?.name ?: "Pilih", maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 108.dp))
             Icon(Icons.Filled.ExpandMore, contentDescription = "Buka daftar workspace")
         }
