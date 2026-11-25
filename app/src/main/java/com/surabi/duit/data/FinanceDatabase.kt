@@ -538,7 +538,16 @@ interface FinanceDao {
               OR t.type = :type
           )
           AND t.occurredAt BETWEEN :startAt AND :endAt
-        ORDER BY t.occurredAt DESC, t.id DESC
+          AND (:accountId IS NULL OR t.fromAccountId = :accountId OR t.toAccountId = :accountId)
+          AND (:categoryId IS NULL OR t.categoryId = :categoryId)
+          AND (:minAmount IS NULL OR t.amountMinor >= :minAmount)
+          AND (:maxAmount IS NULL OR t.amountMinor <= :maxAmount)
+        ORDER BY
+          CASE WHEN :sortOrder = 'OLDEST' THEN t.occurredAt END ASC,
+          CASE WHEN :sortOrder = 'AMOUNT_ASC' THEN t.amountMinor END ASC,
+          CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amountMinor END DESC,
+          t.occurredAt DESC,
+          t.id DESC
         LIMIT 500
     """)
     fun searchTransactions(
@@ -546,7 +555,12 @@ interface FinanceDao {
         query: String,
         type: String,
         startAt: Long,
-        endAt: Long
+        endAt: Long,
+        accountId: Long?,
+        categoryId: Long?,
+        minAmount: Long?,
+        maxAmount: Long?,
+        sortOrder: String
     ): Flow<List<TransactionEntity>>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
