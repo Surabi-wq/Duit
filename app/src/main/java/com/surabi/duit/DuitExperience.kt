@@ -627,12 +627,12 @@ internal fun DuitTransactionTile(
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
         Box(Modifier.size(43.dp).background(accent.copy(alpha = 0.11f), RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
             Icon(when { isTransfer -> Icons.Filled.SwapHoriz; isCredit -> Icons.Filled.ArrowDownward; else -> Icons.Filled.ArrowUpward },
-                contentDescription = transactionTypeLabel(item.type), tint = accent)
+                contentDescription = duitTransactionTypeLabel(item.type), tint = accent)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(item.title, fontWeight = FontWeight.Bold, color = DuitInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOfNotNull(categoryName, accountName, if (isTransfer) "→ ${destinationName ?: "akun tujuan"}" else null)
-                .joinToString(" · ").ifBlank { transactionTypeLabel(item.type) },
+                .joinToString(" · ").ifBlank { duitTransactionTypeLabel(item.type) },
                 style = MaterialTheme.typography.labelSmall, color = DuitMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (item.note.isNotBlank()) Text(item.note, style = MaterialTheme.typography.labelSmall,
                 color = DuitMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -665,4 +665,16 @@ private fun duitCompactMoney(value: Long): String = when {
     value >= 1_000_000L -> "Rp ${"%.1f".format(Locale.US, value / 1_000_000.0)} jt"
     value >= 1_000L -> "Rp ${"%.0f".format(Locale.US, value / 1_000.0)} rb"
     else -> duitMoney(value)
+}
+
+private fun duitTransactionTypeLabel(type: String): String = when (type) {
+    "INCOME" -> "Pemasukan"
+    "EXPENSE" -> "Pengeluaran"
+    "TRANSFER" -> "Transfer"
+    "GOAL_CONTRIBUTION" -> "Setoran target"
+    "GOAL_WITHDRAWAL" -> "Penarikan target"
+    "LIABILITY_PAYMENT" -> "Pembayaran utang"
+    "LIABILITY_RECEIVED" -> "Pencairan pinjaman"
+    "RECEIVABLE_COLLECTION" -> "Penerimaan piutang"
+    else -> "Transaksi"
 }
