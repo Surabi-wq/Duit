@@ -1162,7 +1162,8 @@ private fun GuideScreen() {
         GuideCard("2. Tambahkan akun", "Buat dompet tunai, rekening bank, tabungan, atau e-wallet. Saldo awal menjadi titik awal perhitungan saldo.")
         GuideCard("3. Catat transaksi", "Pilih pemasukan, pengeluaran, atau transfer. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.")
         GuideCard("4. Pantau anggaran", "Buat batas pengeluaran bulanan. Realisasi anggaran dihitung dari transaksi pengeluaran yang tersimpan.")
-        GuideCard("Pencarian dan ekspor", "Halaman Transaksi mencari langsung di database berdasarkan keterangan, catatan, kategori, dan jenis transaksi. Hasil yang ditemukan dapat diekspor ke CSV melalui penyimpanan perangkat; ekspor mengikuti hasil pencarian dan dibatasi maksimal 500 transaksi terbaru.")
+        GuideCard("5. Saring transaksi", "Di halaman Transaksi, cari keterangan atau catatan, lalu gunakan Filter lanjutan untuk menyaring tanggal, akun, kategori, nominal minimum/maksimum, dan urutan hasil. Tanggal akhir mencakup seluruh hari yang dipilih.")
+        GuideCard("6. Ekspor CSV", "Ekspor CSV menyimpan hasil pencarian dan filter yang sedang tampil, maksimal 500 transaksi terbaru. Ekspor CSV bukan backup penuh database.")
         GuideCard("Penyimpanan dan privasi", "Data inti disimpan lokal pada perangkat menggunakan Room/SQLite. Alur utama tidak memerlukan internet. Backup dan restore mandiri terenkripsi belum tersedia, sehingga pengguna perlu menjaga data perangkat dan tidak menganggap ekspor CSV sebagai cadangan penuh database.")
         GuideCard("Fitur tahap berikutnya", "Jurnal akuntansi double-entry, rekonsiliasi, transaksi berulang, lampiran struk, impor file, ekspor PDF/Excel/DOCX, ERP, persediaan, investasi lengkap, pajak, OCR, analisis prediktif, multi-pengguna, enkripsi database, dan backup/restore masih dalam pengembangan.")
     }
