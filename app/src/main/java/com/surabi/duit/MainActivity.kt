@@ -49,6 +49,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,6 +75,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -175,6 +177,9 @@ private fun DuitApp(repository: FinanceRepository) {
     var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
     var showQuickActions by remember { mutableStateOf(false) }
     var dashboardPeriod by remember { mutableStateOf(DashboardPeriod.THIS_MONTH) }
+    var databaseReady by remember { mutableStateOf(false) }
+    var databaseError by remember { mutableStateOf<String?>(null) }
+    var initializationAttempt by remember { mutableIntStateOf(0) }
     var showWorkspaceDialog by remember { mutableStateOf(false) }
     var showTransactionDialog by remember { mutableStateOf(false) }
     var showAccountDialog by remember { mutableStateOf(false) }
@@ -189,7 +194,13 @@ private fun DuitApp(repository: FinanceRepository) {
     var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
     var selectedAccountForMinimum by remember { mutableStateOf<AccountBalanceRow?>(null) }
 
-    LaunchedEffect(Unit) { repository.ensureDefaults() }
+    LaunchedEffect(initializationAttempt) {
+        databaseReady = false
+        databaseError = null
+        runCatching { repository.ensureDefaults() }
+            .onSuccess { databaseReady = true }
+            .onFailure { databaseError = it.message ?: "Database lokal tidak dapat dibuka." }
+    }
     LaunchedEffect(workspaces) {
         if (workspaces.isNotEmpty() && workspaces.none { it.id == selectedWorkspaceId }) {
             selectedWorkspaceId = workspaces.first().id
@@ -323,7 +334,31 @@ private fun DuitApp(repository: FinanceRepository) {
             modifier = Modifier.fillMaxSize().padding(innerPadding),
             color = MaterialTheme.colorScheme.background
         ) {
-            when (selectedTab) {
+            when {
+                !databaseReady && databaseError == null -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            CircularProgressIndicator()
+                            Text("Menyiapkan data keuangan lokal…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+                databaseError != null -> {
+                    DuitEmptyState(
+                        title = "Data lokal tidak dapat dibuka",
+                        message = databaseError ?: "Terjadi kesalahan saat menyiapkan database.",
+                        icon = Icons.Filled.Info,
+                        action = {
+                            OutlinedButton(onClick = { initializationAttempt++ }) { Text("Coba lagi") }
+                        }
+                    )
+                }
+                selectedWorkspace == null -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+                else -> when (selectedTab) {
                 AppTab.DASHBOARD -> DashboardScreen(
                     workspaceName = selectedWorkspace?.name ?: "Workspace",
                     accounts = accounts,
@@ -389,6 +424,7 @@ private fun DuitApp(repository: FinanceRepository) {
                     onUpdateAsset = { selectedAssetForValue = it }
                 )
                 AppTab.GUIDE -> GuideScreen(onNavigate = { selectedTab = it })
+                }
             }
         }
     }
