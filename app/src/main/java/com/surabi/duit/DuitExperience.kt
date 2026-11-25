@@ -34,9 +34,11 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,8 +51,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +73,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.surabi.duit.data.AccountBalanceRow
@@ -236,6 +241,17 @@ internal fun DuitDashboardScreen(
     onOpenTransactions: () -> Unit
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
+    val context = LocalContext.current
+    val widgetPreferences = remember {
+        context.getSharedPreferences("duit-dashboard-widgets", Context.MODE_PRIVATE)
+    }
+    var showWidgetSettings by remember { mutableStateOf(false) }
+    var showTrend by remember { mutableStateOf(widgetPreferences.getBoolean("show_trend", true)) }
+    var showAccounts by remember { mutableStateOf(widgetPreferences.getBoolean("show_accounts", true)) }
+    var showPlanning by remember { mutableStateOf(widgetPreferences.getBoolean("show_planning", true)) }
+    var showAlerts by remember { mutableStateOf(widgetPreferences.getBoolean("show_alerts", true)) }
+    var showDueDates by remember { mutableStateOf(widgetPreferences.getBoolean("show_due_dates", true)) }
+    var showRecentActivity by remember { mutableStateOf(widgetPreferences.getBoolean("show_recent_activity", true)) }
     val alerts = remember(accounts, budgets, liabilities, receivables, income, expenses, period) {
         FinanceAlertEngine.evaluate(
             accounts, budgets, liabilities, receivables, income, expenses,
@@ -272,8 +288,10 @@ internal fun DuitDashboardScreen(
                     fontWeight = FontWeight.ExtraBold, color = DuitInk)
                 Text("$workspaceName  •  $todayText", style = MaterialTheme.typography.bodySmall, color = DuitMuted)
             }
-            Box(Modifier.size(46.dp).background(Color(0xFFE1F2E8), CircleShape), contentAlignment = Alignment.Center) {
-                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null, tint = DuitGreen, modifier = Modifier.size(23.dp))
+            Surface(shape = CircleShape, color = Color(0xFFE1F2E8), modifier = Modifier.size(48.dp)) {
+                IconButton(onClick = { showWidgetSettings = true }, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Filled.Tune, contentDescription = "Atur widget dashboard", tint = DuitGreen)
+                }
             }
         }
 
@@ -297,7 +315,7 @@ internal fun DuitDashboardScreen(
                 DashboardPeriodResolver.label(period), Modifier.weight(1f))
         }
 
-        DuitMonthlyTrendCard(points = trend)
+        if (showTrend) DuitMonthlyTrendCard(points = trend)
 
         Text("Akses cepat", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = DuitInk)
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.fillMaxWidth()) {
@@ -306,6 +324,7 @@ internal fun DuitDashboardScreen(
             DuitQuickAction("Aset", Icons.Filled.Wallet, Color(0xFFFFF0D9), Color(0xFFB96E0C), onOpenWealth, Modifier.weight(1f))
         }
 
+        if (showAccounts) {
         DuitDashboardSectionHeader("Dompet dan rekening", "Saldo tiap akun", "Semua akun", onOpenWealth)
         if (accounts.isEmpty()) {
             DuitEmptyState(title = "Belum ada dompet atau rekening",
@@ -314,6 +333,8 @@ internal fun DuitDashboardScreen(
             accounts.take(3).forEach { DuitAccountRow(it) }
         }
 
+        }
+        if (showPlanning) {
         DuitDashboardSectionHeader("Rencana berjalan", "Anggaran dan sasaran tabungan", "Kelola", onOpenPlanning)
         if (budgets.isEmpty() && goals.isEmpty()) {
             DuitEmptyState(title = "Belum ada rencana keuangan",
@@ -324,7 +345,8 @@ internal fun DuitDashboardScreen(
             goals.take(2).forEach { DuitGoalSnapshot(it) }
         }
 
-        if (alerts.isNotEmpty()) {
+        }
+        if (showAlerts && alerts.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 DuitDashboardSectionHeader("Perlu perhatian", "Peringatan berbasis catatan keuangan lokal", null, null)
                 alerts.take(3).forEach { alert ->
@@ -342,7 +364,8 @@ internal fun DuitDashboardScreen(
             }
         }
 
-        if (dueRows.isNotEmpty()) {
+        }
+        if (showDueDates && dueRows.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 DuitDashboardSectionHeader("Jatuh tempo mendatang", "Data dari utang dan piutang aktif", null, null)
                 dueRows.forEach { (kind, name, dueAt) ->
@@ -364,6 +387,7 @@ internal fun DuitDashboardScreen(
             }
         }
 
+        if (showRecentActivity) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Aktivitas terbaru", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = DuitInk)
@@ -377,7 +401,47 @@ internal fun DuitDashboardScreen(
         } else {
             transactions.take(4).forEach { DuitTransactionTile(item = it) }
         }
+        }
         Spacer(Modifier.height(82.dp))
+    }
+    if (showWidgetSettings) {
+        AlertDialog(
+            onDismissRequest = { showWidgetSettings = false },
+            title = { Text("Atur dashboard") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Pilih ringkasan yang ingin ditampilkan. Pengaturan disimpan di perangkat ini.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    DashboardWidgetToggle("Tren arus kas", showTrend) {
+                        showTrend = it; widgetPreferences.edit().putBoolean("show_trend", it).apply()
+                    }
+                    DashboardWidgetToggle("Dompet dan rekening", showAccounts) {
+                        showAccounts = it; widgetPreferences.edit().putBoolean("show_accounts", it).apply()
+                    }
+                    DashboardWidgetToggle("Anggaran dan target", showPlanning) {
+                        showPlanning = it; widgetPreferences.edit().putBoolean("show_planning", it).apply()
+                    }
+                    DashboardWidgetToggle("Peringatan keuangan", showAlerts) {
+                        showAlerts = it; widgetPreferences.edit().putBoolean("show_alerts", it).apply()
+                    }
+                    DashboardWidgetToggle("Jatuh tempo", showDueDates) {
+                        showDueDates = it; widgetPreferences.edit().putBoolean("show_due_dates", it).apply()
+                    }
+                    DashboardWidgetToggle("Aktivitas terbaru", showRecentActivity) {
+                        showRecentActivity = it; widgetPreferences.edit().putBoolean("show_recent_activity", it).apply()
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showWidgetSettings = false }) { Text("Selesai") } }
+        )
+    }
+}
+
+@Composable
+private fun DashboardWidgetToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
