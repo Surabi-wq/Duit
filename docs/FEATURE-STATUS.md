@@ -1,6 +1,16 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **1.0.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 4.
+
+## Pembaruan versi 1.1.0 — histori, ekspor, privasi, dan dashboard
+
+- Histori transaksi menggunakan Room PagingSource + AndroidX Paging 3: 40 item per halaman, initial load 60, prefetch 20, dan cache maksimum 200 item. Loading, error, retry, dan empty state sudah ditangani di UI. Tidak memakai query riwayat yang di-limit 500 untuk tampilan.
+- Filter transaksi tetap mencakup teks, jenis, tanggal, akun, kategori, rentang nominal, dan pengurutan. Validasi workspace diterapkan pada akun/kategori filter.
+- Ekspor CSV mengeksekusi query filter yang sama dalam batch 200 baris dan menulis langsung ke Writer tujuan; tidak membangun seluruh file sebagai satu String. Semua hasil yang cocok diekspor tanpa batas 500 pada jalur streaming. Perlindungan formula spreadsheet dan UTF-8 BOM tetap dipertahankan.
+- Pengaturan widget dashboard persisten lokal: tren arus kas, dompet/rekening, anggaran/target, peringatan, jatuh tempo, aktivitas terbaru.
+- Penyembunyian nominal global persisten di preferensi lokal dan berlaku pada tampilan utama, riwayat, perencanaan, aset/kewajiban, serta teks peringatan dashboard. Ini hanya menyamarkan tampilan, bukan enkripsi atau kunci aplikasi.
+- Navigasi bawah menggunakan semantik tab dan status terpilih untuk pembaca layar.
+- Room v3→v4 menambahkan indeks gabungan (workspaceId, isVoided, occurredAt, id) untuk query histori. Migrasi aman tanpa destructive migration; rumus saldo, transfer, dana target, piutang, kewajiban, dan kekayaan bersih tidak diubah.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -17,7 +27,7 @@ Versi source saat ini: **1.0.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Filter berdasarkan jenis, rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, dan pengurutan tanggal atau nominal.
 - Validasi rentang tanggal menolak tanggal kalender tidak valid, teks tambahan, dan rentang awal yang melebihi tanggal akhir.
 - Filter divalidasi pada repository dan query dijalankan pada database; pencarian tidak memuat seluruh histori transaksi ke memori.
-- Ekspor CSV dari hasil pencarian dan filter yang sedang ditampilkan melalui Android Storage Access Framework; maksimal 500 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
+- Ekspor CSV dari filter aktif melalui Android Storage Access Framework; seluruh hasil ditulis streaming dalam batch 200 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
 - Pembatalan transaksi (void) dengan alasan yang tersimpan pada audit log; catatan transaksi tidak dihapus.
 - Validasi akun/kategori harus berasal dari workspace yang sama.
 - Semua insert yang terkait dilakukan dalam transaksi database Room.
@@ -47,10 +57,10 @@ Versi source saat ini: **1.0.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
-- Database versi 3 dengan migrasi eksplisit versi 1→2 dan 2→3; tidak memakai destructive migration.
+- Database versi 4 dengan migrasi eksplisit versi 1→2, 2→3, dan 3→4 (indeks tambahan); tidak memakai destructive migration.
 - Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, perubahan batas saldo minimum akun, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
-- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, batas periode dashboard, validasi nominal batas saldo minimum, serta escaping dan perlindungan formula pada CSV.
+- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, batas periode dashboard, validasi nominal batas saldo minimum, escaping/perlindungan formula CSV, kesetaraan keluaran ekspor streaming, dan konfigurasi cache paging.
 
 
 ## Peningkatan UI/UX yang sudah terhubung ke data — 0.8.0
