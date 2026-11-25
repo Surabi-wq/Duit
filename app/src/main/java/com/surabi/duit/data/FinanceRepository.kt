@@ -3,6 +3,7 @@ package com.surabi.duit.data
 import androidx.room.withTransaction
 import androidx.paging.Pager
 import androidx.paging.PagingData
+import java.io.Writer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -56,6 +57,52 @@ class FinanceRepository(private val database: FinanceDatabase) {
                 sortOrder = sortOrder
             )
         }.flow
+    }
+
+    /** Streams every matching non-voided transaction to CSV in bounded database batches. */
+    suspend fun exportTransactionsToCsv(request: TransactionExportRequest, writer: Writer) {
+        require(request.type in setOf("ALL", "INCOME", "EXPENSE", "TRANSFER", "OTHER")) {
+            "Filter jenis transaksi tidak valid."
+        }
+        require(request.startAt <= request.endAt) { "Rentang tanggal transaksi tidak valid." }
+        require(request.minAmount == null || request.minAmount >= 0L) { "Nominal minimum tidak boleh negatif." }
+        require(request.maxAmount == null || request.maxAmount >= 0L) { "Nominal maksimum tidak boleh negatif." }
+        require(request.minAmount == null || request.maxAmount == null || request.minAmount <= request.maxAmount) {
+            "Nominal minimum tidak boleh melebihi nominal maksimum."
+        }
+        require(request.accountId == null || dao.getAccount(request.accountId, request.workspaceId) != null) {
+            "Akun filter tidak ditemukan pada workspace ini."
+        }
+        if (request.categoryId != null) {
+            require(dao.getCategoryKind(request.categoryId, request.workspaceId) != null) {
+                "Kategori filter tidak ditemukan pada workspace ini."
+            }
+        }
+
+        val batchSize = 200
+        var offset = 0
+        TransactionCsvExporter.appendHeader(writer)
+        while (true) {
+            val batch = dao.exportSearchTransactionsPage(
+                workspaceId = request.workspaceId,
+                query = request.query.trim(),
+                type = request.type,
+                startAt = request.startAt,
+                endAt = request.endAt,
+                accountId = request.accountId,
+                categoryId = request.categoryId,
+                minAmount = request.minAmount,
+                maxAmount = request.maxAmount,
+                sortOrder = request.sortOrder,
+                limit = batchSize,
+                offset = offset
+            )
+            if (batch.isEmpty()) break
+            TransactionCsvExporter.appendRows(writer, batch, request.accountNames, request.categoryNames)
+            writer.flush()
+            offset += batch.size
+            if (batch.size < batchSize) break
+        }
     }
 
     fun income(workspaceId: Long, startAt: Long, endAt: Long): Flow<Long> =
