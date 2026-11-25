@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
@@ -448,6 +449,7 @@ private fun DashboardScreen(
     budgets: List<BudgetOverviewRow>,
     income: Long,
     expenses: Long,
+    netWorth: Long,
     onAddTransaction: () -> Unit
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
@@ -472,6 +474,18 @@ private fun DashboardScreen(
                     color = Color.White
                 )
                 Text(accounts.size.toString() + " akun aktif", color = Color.White.copy(alpha = 0.82f))
+            }
+        }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Estimasi kekayaan bersih terdata", color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text(formatRupiah(netWorth), style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondaryContainer)
+                Text("Saldo akun + dana target + aset non-tunai − sisa utang",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -598,15 +612,34 @@ private fun TransactionsScreen(
     transactions: List<TransactionEntity>,
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    onVoid: (Long, String) -> Unit
 ) {
     val accountNames = accounts.associate { it.id to it.name }
     val categoryNames = categories.associate { it.id to it.name }
+    var searchQuery by remember { mutableStateOf("") }
+    var typeFilter by remember { mutableStateOf("ALL") }
+    var selectedToVoid by remember { mutableStateOf<TransactionEntity?>(null) }
+    var voidReason by remember { mutableStateOf("") }
+    val visible = transactions.filter { item ->
+        val textMatches = searchQuery.isBlank() ||
+            item.title.contains(searchQuery, ignoreCase = true) ||
+            item.note.contains(searchQuery, ignoreCase = true) ||
+            (categoryNames[item.categoryId]?.contains(searchQuery, ignoreCase = true) == true)
+        val typeMatches = when (typeFilter) {
+            "ALL" -> true
+            "OTHER" -> item.type !in setOf("INCOME", "EXPENSE", "TRANSFER")
+            else -> item.type == typeFilter
+        }
+        textMatches && typeMatches
+    }
+
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Semua transaksi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Maksimal 200 transaksi terbaru pada workspace ini", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Pencarian pada 200 transaksi terbaru di workspace ini",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(onClick = onAdd) {
                 Icon(Icons.Filled.Add, contentDescription = null)
@@ -614,24 +647,68 @@ private fun TransactionsScreen(
                 Text("Tambah")
             }
         }
-        Spacer(Modifier.height(12.dp))
-        if (transactions.isEmpty()) {
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            label = { Text("Cari keterangan, catatan, atau kategori") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            listOf("ALL" to "Semua", "INCOME" to "Masuk", "EXPENSE" to "Keluar",
+                "TRANSFER" to "Transfer", "OTHER" to "Lainnya").forEach { (key, label) ->
+                FilterChip(selected = typeFilter == key, onClick = { typeFilter = key }, label = { Text(label) })
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (visible.isEmpty()) {
             EmptyHint(
-                title = "Belum ada transaksi",
-                body = "Transaksi yang Anda simpan akan muncul di halaman ini."
+                title = if (transactions.isEmpty()) "Belum ada transaksi" else "Transaksi tidak ditemukan",
+                body = if (transactions.isEmpty()) "Transaksi yang Anda simpan akan muncul di halaman ini."
+                    else "Ubah kata pencarian atau filter jenis transaksi."
             )
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(transactions, key = { it.id }) { item ->
+                items(visible, key = { it.id }) { item ->
                     TransactionCard(
                         item,
                         accountName = accountNames[item.fromAccountId],
                         destinationName = item.toAccountId?.let { accountNames[it] },
-                        categoryName = item.categoryId?.let { categoryNames[it] }
+                        categoryName = item.categoryId?.let { categoryNames[it] },
+                        onVoid = { selectedToVoid = item }
                     )
                 }
             }
         }
+    }
+
+    selectedToVoid?.let { item ->
+        AlertDialog(
+            onDismissRequest = { selectedToVoid = null; voidReason = "" },
+            title = { Text("Batalkan transaksi?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Transaksi \"${item.title}\" akan dikecualikan dari saldo dan laporan. Catatan pembatalan disimpan di audit trail.")
+                    OutlinedTextField(
+                        value = voidReason,
+                        onValueChange = { voidReason = it },
+                        label = { Text("Alasan pembatalan") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = voidReason.isNotBlank(), onClick = {
+                    onVoid(item.id, voidReason)
+                    selectedToVoid = null
+                    voidReason = ""
+                }) { Text("Batalkan transaksi") }
+            },
+            dismissButton = { TextButton(onClick = { selectedToVoid = null; voidReason = "" }) { Text("Kembali") } }
+        )
     }
 }
 
@@ -640,13 +717,15 @@ private fun TransactionCard(
     item: TransactionEntity,
     accountName: String? = null,
     destinationName: String? = null,
-    categoryName: String? = null
+    categoryName: String? = null,
+    onVoid: (() -> Unit)? = null
 ) {
-    val isIncome = item.type == "INCOME"
+    val isCredit = item.type in setOf("INCOME", "GOAL_WITHDRAWAL", "LIABILITY_RECEIVED")
+    val isDebit = item.type in setOf("EXPENSE", "GOAL_CONTRIBUTION", "LIABILITY_PAYMENT")
     val isTransfer = item.type == "TRANSFER"
-    val accent = when (item.type) {
-        "INCOME" -> MaterialTheme.colorScheme.primary
-        "EXPENSE" -> MaterialTheme.colorScheme.error
+    val accent = when {
+        isCredit -> MaterialTheme.colorScheme.primary
+        isDebit -> MaterialTheme.colorScheme.error
         else -> MaterialTheme.colorScheme.secondary
     }
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -660,7 +739,7 @@ private fun TransactionCard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    if (isTransfer) Icons.Filled.SwapHoriz else if (isIncome) Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
+                    if (isTransfer) Icons.Filled.SwapHoriz else if (isCredit) Icons.Filled.ArrowDownward else Icons.Filled.ArrowUpward,
                     contentDescription = null,
                     tint = accent
                 )
@@ -682,12 +761,19 @@ private fun TransactionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                (if (isIncome) "+" else if (isTransfer) "↔ " else "− ") + formatRupiah(item.amountMinor),
-                fontWeight = FontWeight.Bold,
-                color = accent,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    (if (isCredit) "+" else if (isTransfer) "↔ " else "− ") + formatRupiah(item.amountMinor),
+                    fontWeight = FontWeight.Bold,
+                    color = accent,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                if (onVoid != null) {
+                    IconButton(onClick = onVoid) {
+                        Icon(Icons.Filled.DeleteOutline, contentDescription = "Batalkan transaksi", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
         }
     }
 }
@@ -1135,6 +1221,10 @@ private fun transactionTypeLabel(type: String): String = when (type) {
     "INCOME" -> "Pemasukan"
     "EXPENSE" -> "Pengeluaran"
     "TRANSFER" -> "Transfer"
+    "GOAL_CONTRIBUTION" -> "Setoran target"
+    "GOAL_WITHDRAWAL" -> "Penarikan target"
+    "LIABILITY_PAYMENT" -> "Pembayaran utang"
+    "LIABILITY_RECEIVED" -> "Pencairan pinjaman"
     else -> "Transaksi"
 }
 
