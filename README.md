@@ -1,70 +1,81 @@
 # Duit — Pengelola Keuangan Offline
 
-Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lokal. Identitas visual menggunakan hijau, putih, dan biru. Data inti disimpan secara lokal melalui Room/SQLite; aplikasi tidak memerlukan koneksi internet untuk alur yang tersedia.
+Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lokal. Identitas visual menggunakan hijau, putih, dan biru. Data inti disimpan secara lokal melalui Room/SQLite; alur inti aplikasi tidak memerlukan koneksi internet.
 
 ## Versi source
 
-- Versi: **0.4.0**
+- Versi: **0.5.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
 - Kotlin: 2.3.21
 - Android Gradle Plugin: 8.13.2
 - Penyimpanan: Room di atas SQLite
-- Nilai uang: integer Rupiah (`Long`), tanpa floating-point
+- Database Room: versi 3
+- Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
 
-## Fitur yang sudah tersedia
+## Fitur yang sudah memiliki alur kerja nyata
 
 ### Workspace, akun, dan dashboard
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun per workspace: tunai, bank, tabungan, e-wallet, kartu kredit, investasi, dan lainnya.
-- Saldo akun dihitung dari saldo awal serta transaksi; bukan disimpan sebagai angka yang dapat tertinggal dari histori.
-- Dashboard menampilkan saldo akun, pemasukan, pengeluaran, arus kas bulan berjalan, anggaran, estimasi kekayaan bersih, serta peringatan saldo minimum, anggaran, arus kas negatif, dan jatuh tempo utang/piutang.
+- Saldo akun dihitung dari saldo awal serta transaksi; bukan angka saldo manual yang dapat tertinggal dari histori.
+- Dashboard workspace menampilkan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, aktivitas transaksi terbaru, dan peringatan berbasis aturan lokal.
+- Peringatan mencakup saldo negatif, saldo di bawah batas minimum, anggaran hampir habis/terlampaui, arus kas negatif, serta utang/piutang yang melewati jatuh tempo.
 
 ### Transaksi
-- Pemasukan, pengeluaran, dan transfer antar-akun.
-- Validasi akun dan kategori harus berasal dari workspace yang sama.
+- Pemasukan, pengeluaran, transfer antar-akun, pergerakan dana target, pencairan/pembayaran utang, dan penerimaan piutang.
 - Transfer mengurangi akun sumber dan menambah akun tujuan tanpa mengubah total pemasukan/pengeluaran.
-- Pencarian/filter pada 200 transaksi terbaru di workspace berdasarkan keterangan, catatan, kategori, dan jenis.
-- Pembatalan transaksi dengan alasan; histori tidak dihapus, transaksi ditandai void dan alasan masuk ke audit log.
+- Validasi akun dan kategori memastikan relasi berada dalam workspace yang sama.
+- Pencarian transaksi dijalankan langsung pada SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi.
+- Hasil pencarian menampilkan maksimal 500 transaksi terbaru yang cocok; filter jenis mencakup transaksi khusus seperti setoran target, pembayaran utang, dan penerimaan piutang.
+- Ekspor CSV menyimpan hasil pencarian yang sedang ditampilkan melalui pemilih lokasi simpan Android. Ekspor dibatasi maksimal 500 baris dan bukan pengganti backup database.
+- Pembatalan transaksi menggunakan status void dengan alasan; histori tidak dihapus dan pembatalan dicatat pada audit log.
 
 ### Anggaran dan target tabungan
 - Anggaran bulanan umum atau berdasarkan kategori pengeluaran.
 - Target tabungan dengan nominal tujuan dan prioritas.
 - Setoran target mengurangi saldo akun yang dipilih; penarikan mengembalikan saldo akun.
-- Dana target dihitung dari transaksi setoran/penarikan yang terkait, bukan input saldo manual yang tidak tersinkron.
+- Dana target dihitung dari transaksi setoran/penarikan yang terkait, bukan saldo manual yang dapat tidak sinkron.
 
-### Aset dan kewajiban
+### Aset, utang, dan piutang
 - Pencatatan aset non-tunai: kendaraan, properti, tanah, emas, elektronik, peralatan, dan lainnya.
-- Harga perolehan dan nilai saat ini; nilai aset dapat diperbarui dengan pencatatan audit.
-- Pencatatan utang/pinjaman, pemberi pinjaman, nilai awal, dan tanggal jatuh tempo opsional.
-- Pencairan pinjaman dapat menambah saldo akun ketika dana baru diterima dan belum tercatat.
+- Pencatatan harga perolehan dan nilai terkini; perubahan nilai aset dicatat pada audit log.
+- Pencatatan utang/pinjaman, pemberi pinjaman, nilai awal, dan jatuh tempo opsional.
+- Pencairan pinjaman dapat menambah saldo akun ketika dana baru diterima dan belum pernah dicatat.
 - Pembayaran pokok utang mengurangi saldo akun dan sisa kewajiban.
-- Estimasi kekayaan bersih dihitung dari saldo akun + dana target + nilai aset non-tunai − sisa utang.
+- Pencatatan piutang/tagihan per workspace, pihak yang berutang, nilai awal, jatuh tempo opsional, dan catatan.
+- Penerimaan piutang dapat dicatat sebagian atau penuh ke akun yang dipilih; validasi mencegah penerimaan melebihi sisa piutang.
+- Sisa piutang dihitung dari penerimaan yang belum dibatalkan. Pembatalan penerimaan memulihkan saldo akun dan sisa tagihan.
 
-## Aturan pencatatan untuk mencegah penghitungan ganda
+### Aturan pencatatan untuk mencegah penghitungan ganda
+1. Transfer antar-akun bukan pemasukan atau pengeluaran.
+2. Setoran target mengurangi akun sumber, tetapi menambah dana target; karena itu bukan biaya.
+3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
+4. Pembayaran pokok utang mengurangi akun dan kewajiban; bukan seluruhnya biaya.
+5. Pencairan pinjaman menambah akun dan kewajiban; bukan pendapatan.
+6. Nilai aset non-tunai tidak boleh mencakup rekening/dompet yang sudah dicatat pada modul akun.
+7. Saat mencatat utang yang dananya sudah ada di saldo akun, jangan pilih akun penerima lagi.
+8. Pencatatan piutang tidak otomatis menambah saldo tunai/rekening; saldo akun bertambah hanya saat penerimaan benar-benar dicatat.
+9. Penerimaan piutang dasar mengurangi sisa tagihan. Pengakuan pendapatan dan pembuatan invoice/penjualan kredit yang terhubung belum tersedia.
 
-- Jangan masukkan saldo rekening/dompet sebagai aset non-tunai; rekening dan dompet sudah masuk melalui modul akun.
-- Saat mencatat utang yang dananya sudah pernah dimasukkan ke saldo akun, jangan pilih akun penerima lagi.
-- Pencairan pinjaman bukan pemasukan; pembayaran pokok utang bukan seluruhnya pengeluaran.
-- Setoran target bukan pengeluaran; penarikan target bukan pemasukan.
-- Versi ini belum memiliki alur pembelian/penjualan aset yang otomatis membuat jurnal dan memindahkan uang. Bila aset baru dibeli setelah aplikasi digunakan, transaksi pembelian dan pengakuan aset belum terintegrasi penuh; jangan menganggap laporan kekayaan sudah menjadi buku besar akuntansi.
+## Fitur yang belum tersedia sebagai fungsi lengkap
 
-## Status fitur lanjutan
+Fitur berikut masih menjadi backlog dan tidak boleh dianggap aktif hanya karena ada istilah, komponen, atau rancangan antarmukanya:
+- Rekonsiliasi rekening, penyesuaian saldo formal, edit transaksi umum, transaksi berulang/terjadwal/massal, template, lampiran struk, dan pembatalan melalui reversal jurnal double-entry.
+- Impor CSV/spreadsheet; ekspor laporan PDF/Excel/DOCX; ekspor transaksi tanpa batas/pagination.
+- Target dengan setoran terjadwal otomatis dan notifikasi.
+- Riwayat nilai aset terstruktur, penyusutan, pemeliharaan, pembelian/penjualan/penghapusan aset yang terhubung ke jurnal.
+- Jadwal cicilan, bunga/denda terstruktur, analisis umur piutang, dan penagihan lanjutan.
+- Chart of Accounts, jurnal double-entry, buku besar, buku pembantu, neraca saldo, neraca, laba rugi, laporan arus kas akuntansi, perubahan ekuitas, serta periode akuntansi.
+- ERP multi-perusahaan/cabang/departemen/cost center/proyek, penjualan, pembelian, invoice, pelanggan, pemasok, produk, persediaan, gudang, dan HPP.
+- Portofolio investasi lengkap, harga pasar otomatis, dividen, obligasi, dan analisis alokasi.
+- Pajak, invoice/kwitansi profesional, arsip dokumen, serta dokumen administrasi.
+- Grafik lanjutan, perbandingan periode/workspace, analisis prediktif, simulasi, OCR lokal, dan asisten bahasa sehari-hari.
+- Multi-user, role/permission, persetujuan berjenjang, PIN/biometrik, enkripsi database, pengamanan lampiran, dan backup/restore terenkripsi dengan checksum.
+- Personalisasi lengkap, tema gelap/sistem, mode pemula/mahir, dan multi-mata uang.
 
-Modul berikut **belum tersedia sebagai fungsi lengkap** dan tidak boleh dianggap aktif hanya karena masuk daftar kebutuhan produk:
-- Rekonsiliasi akun, penyesuaian saldo terkontrol, edit transaksi umum, transaksi berulang/terjadwal/massal, template, lampiran struk, impor/ekspor.
-- Target dengan jadwal setoran otomatis dan notifikasi.
-- Riwayat nilai aset terstruktur, penyusutan, pemeliharaan, pembelian/penjualan/penghapusan aset yang terhubung dengan jurnal.
-- Piutang, bunga/denda terstruktur, cicilan otomatis, pengingat jatuh tempo.
-- Chart of Accounts, jurnal double-entry, buku besar, buku pembantu, neraca saldo, neraca, laba rugi, laporan arus kas akuntansi, periode akuntansi.
-- ERP multi-perusahaan/cabang/departemen/cost center/proyek, penjualan, pembelian, invoice, pelanggan, pemasok, produk, stok, gudang, dan HPP.
-- Manajemen portofolio investasi lengkap, harga pasar otomatis, pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/CSV/DOCX.
-- Analisis tren/prediksi, grafik lanjutan, OCR lokal, asisten bahasa sehari-hari.
-- Multi-user, role/permission, approval berjenjang, PIN, biometrik, enkripsi database, backup/restore terenkripsi, checksum, dan enkripsi lampiran.
-- Personalisasi lengkap, mode pemula/mahir, multi-mata uang, konsolidasi enterprise.
-
-Lihat [docs/FEATURE-STATUS.md](docs/FEATURE-STATUS.md) untuk matriks implementasi dan gerbang penerimaan.
+Lihat [docs/FEATURE-STATUS.md](docs/FEATURE-STATUS.md) untuk status yang lebih terperinci dan gerbang penerimaan.
 
 ## Build
 
@@ -76,16 +87,20 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-CI di GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama `Duit-0.4.0.apk`.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.5.0.apk**.
 
 ## Signing dan distribusi
 
-Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian internal. APK ini dapat dipasang untuk pengujian, tetapi **belum ditandatangani dengan kunci rilis privat** untuk distribusi komersial/pembaruan jangka panjang. Sebelum distribusi, buat keystore rilis, simpan kredensialnya sebagai secret CI, dan konfigurasi signing release. Jangan pernah commit keystore atau password ke repository.
+Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian internal. APK ini dapat dipasang untuk pengujian, tetapi **belum ditandatangani dengan kunci rilis privat** untuk distribusi komersial atau pembaruan jangka panjang. Sebelum distribusi, buat keystore rilis, simpan kredensialnya sebagai secret CI, dan konfigurasi signing release. Jangan pernah commit keystore atau password ke repository.
 
 ## Database dan kompatibilitas
 
-Database Room saat ini berada pada versi 2 dengan migrasi eksplisit dari versi 1. Jangan gunakan destructive migration pada data pengguna. Sebelum penggunaan produksi, jalankan tes upgrade database dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Fitur backup/restore belum tersedia pada 0.4.0.
+Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.5.0.
 
-## Pengujian yang telah dilakukan
+## Ekspor CSV dan keamanan spreadsheet
 
-CI versi 0.4.0 telah lulus `testDebugUnitTest` dan `assembleRelease`. Pengujian instalasi/upgrade dan alur UI pada perangkat Android fisik belum dilakukan dalam CI. Keberhasilan build bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai.
+Ekspor hanya mencakup hasil pencarian yang ditampilkan (maksimal 500 transaksi terbaru yang cocok). File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
+
+## Pengujian dan batas verifikasi
+
+CI menjalankan `:app:testDebugUnitTest` dan `:app:assembleRelease`. Unit test mencakup parsing nominal Rupiah, aturan peringatan, serta escaping dan perlindungan formula pada ekspor CSV. Build yang berhasil bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai. Pengujian instalasi, upgrade database, alur UI, ekspor melalui Storage Access Framework, kinerja dataset besar, dan penggunaan offline tetap perlu diverifikasi pada perangkat Android fisik.
