@@ -4,15 +4,24 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **1.0.0**
+- Versi: **1.1.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
 - Kotlin: 2.3.21
 - Android Gradle Plugin: 8.13.2
 - Penyimpanan: Room di atas SQLite
-- Database Room: versi 3
+- Database Room: versi 4
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
+
+## Perbaikan lanjutan UI/UX dan performa versi 1.1.0
+
+- Histori transaksi kini memakai AndroidX Paging 3 dan query Room PagingSource. Data dibaca bertahap dari SQLite (halaman 40 baris, pemuatan awal 60, cache maksimal 200 item) dengan indikator loading, error, dan retry; hasil pencarian tidak lagi dibatasi 500 baris.
+- Ekspor CSV mengikuti filter yang aktif dan menulis histori yang cocok melalui batch 200 baris langsung ke penyimpanan yang dipilih. Seluruh hasil cocok diekspor tanpa mengumpulkan semua transaksi menjadi satu string besar di memori.
+- Dashboard menyediakan pengaturan enam widget—tren, rekening, rencana, peringatan, jatuh tempo, dan aktivitas terbaru—yang disimpan lokal pada perangkat.
+- Penyembunyian nominal global tersedia pada header, dipertahankan melalui preferensi lokal, dan menutupi nilai pada dashboard, transaksi, serta modul rencana/aset; teks detail peringatan juga disamarkan.
+- Bottom navigation memiliki role dan status terpilih untuk pembaca layar.
+- Database ditingkatkan dari Room v3 ke v4 hanya dengan menambahkan indeks gabungan untuk histori transaksi. Migrasi 1→2, 2→3, dan 3→4 tetap eksplisit; data transaksi pengguna tidak dihapus dan rumus saldo/kekayaan bersih tidak diubah.
 
 ## Perombakan pengalaman aplikasi versi 1.0.0
 
@@ -47,7 +56,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Panduan menjadi pusat bantuan yang dapat dicari dan berisi pintasan menuju modul terkait.
 - Seluruh alur UI baru tetap membaca data Room/SQLite lokal; tidak ada data demo atau layanan eksternal baru.
 
-Catatan cakupan: daftar transaksi masih dibatasi 500 hasil oleh query saat ini. Pagination/muat bertahap untuk histori ribuan transaksi belum selesai. Pengujian navigasi dan tampilan pada perangkat Android fisik serta ukuran font besar masih diperlukan.
+Catatan cakupan: histori transaksi dan ekspor CSV sekarang memakai pemuatan/penulisan bertahap. Pengujian perangkat langsung dan pengujian performa pada basis data sangat besar tetap diperlukan. Pengujian navigasi dan tampilan pada perangkat Android fisik serta ukuran font besar masih diperlukan.
 
 ### Workspace, akun, dan dashboard
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
@@ -64,8 +73,8 @@ Catatan cakupan: daftar transaksi masih dibatasi 500 hasil oleh query saat ini. 
 - Pencarian transaksi dijalankan langsung pada SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi.
 - Filter lanjutan mencakup rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, serta pengurutan berdasarkan tanggal atau nominal.
 - Validasi tanggal menolak tanggal kalender yang tidak sah, teks tambahan, dan rentang tanggal terbalik.
-- Hasil pencarian menampilkan maksimal 500 transaksi terbaru yang cocok; filter jenis mencakup transaksi khusus seperti setoran target, pembayaran utang, dan penerimaan piutang.
-- Ekspor CSV menyimpan hasil pencarian dan filter yang sedang ditampilkan melalui pemilih lokasi simpan Android. Ekspor dibatasi maksimal 500 baris dan bukan pengganti backup database.
+- Filter transaksi mencakup jenis khusus seperti setoran target, pembayaran utang, dan penerimaan piutang. Pada versi 1.1.0, tampilan histori dimuat secara bertahap melalui Paging 3.
+- Ekspor CSV menyimpan seluruh hasil pencarian/filter aktif secara streaming ke lokasi pilihan Android. Ekspor CSV bukan pengganti backup database.
 - Pembatalan transaksi menggunakan status void dengan alasan; histori tidak dihapus dan pembatalan dicatat pada audit log.
 
 ### Anggaran dan target tabungan
@@ -123,7 +132,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.0.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.1.0.apk**.
 
 ## Signing dan distribusi
 
@@ -131,11 +140,11 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.0.0.
+Database Room versi 4 memiliki migrasi eksplisit dari versi 1 ke 2, versi 2 ke 3, dan versi 3 ke 4. Migrasi 3→4 hanya menambahkan indeks gabungan untuk pencarian/paging transaksi. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.0.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 
-Ekspor hanya mencakup hasil pencarian yang ditampilkan (maksimal 500 transaksi terbaru yang cocok). File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
+Ekspor pada versi 1.1.0 memuat seluruh hasil filter aktif secara streaming dalam batch database; bukan dibatasi 500 transaksi. File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
 
 ## Pengujian dan batas verifikasi
 

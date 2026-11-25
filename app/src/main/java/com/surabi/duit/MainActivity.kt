@@ -1,10 +1,15 @@
 package com.surabi.duit
 
 import android.os.Bundle
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.paging.LoadState
+import androidx.paging.PagingData
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Clear
@@ -111,9 +116,10 @@ import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.TransactionDateRange
-import com.surabi.duit.data.TransactionCsvExporter
+import com.surabi.duit.data.TransactionExportRequest
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
+import com.surabi.duit.ui.LocalDuitBalancesVisible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
@@ -134,9 +140,22 @@ class MainActivity : ComponentActivity() {
         window.decorView.systemUiVisibility =
             window.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
         val repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
+        val displayPreferences = getSharedPreferences("duit-display-preferences", MODE_PRIVATE)
         setContent {
+            var balancesVisible by remember {
+                mutableStateOf(displayPreferences.getBoolean("balances_visible", true))
+            }
             DuitTheme {
-                DuitApp(repository)
+                CompositionLocalProvider(LocalDuitBalancesVisible provides balancesVisible) {
+                    DuitApp(
+                        repository = repository,
+                        balancesVisible = balancesVisible,
+                        onBalancesVisibleChange = { visible ->
+                            balancesVisible = visible
+                            displayPreferences.edit().putBoolean("balances_visible", visible).apply()
+                        }
+                    )
+                }
             }
         }
     }
@@ -155,27 +174,33 @@ private enum class AppTab(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DuitApp(repository: FinanceRepository) {
+private fun DuitApp(
+    repository: FinanceRepository,
+    balancesVisible: Boolean,
+    onBalancesVisibleChange: (Boolean) -> Unit
+) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var pendingCsv by remember { mutableStateOf<String?>(null) }
+    var pendingCsvRequest by remember { mutableStateOf<TransactionExportRequest?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
-        val csv = pendingCsv
-        pendingCsv = null
-        if (uri != null && csv != null) {
+        val request = pendingCsvRequest
+        pendingCsvRequest = null
+        if (uri != null && request != null) {
             scope.launch {
                 val writeResult = withContext(Dispatchers.IO) {
                     runCatching {
                         val output = context.contentResolver.openOutputStream(uri)
                             ?: error("Lokasi penyimpanan tidak dapat dibuka.")
-                        output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                        output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                            repository.exportTransactionsToCsv(request, writer)
+                        }
                     }
                 }
                 writeResult
-                    .onSuccess { snackbar.showSnackbar("Ekspor CSV berhasil disimpan.") }
+                    .onSuccess { snackbar.showSnackbar("Ekspor seluruh hasil filter berhasil disimpan.") }
                     .onFailure { snackbar.showSnackbar(it.message ?: "Ekspor CSV gagal disimpan.") }
             }
         }
@@ -201,6 +226,11 @@ private fun DuitApp(repository: FinanceRepository) {
     var selectedReceivableCollection by remember { mutableStateOf<ReceivableOverviewRow?>(null) }
     var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
     var selectedAccountForMinimum by remember { mutableStateOf<AccountBalanceRow?>(null) }
+
+    // System back from a top-level destination returns to the dashboard instead of exiting the app.
+    BackHandler(enabled = selectedTab != AppTab.DASHBOARD) {
+        selectedTab = AppTab.DASHBOARD
+    }
 
     LaunchedEffect(initializationAttempt) {
         databaseReady = false
@@ -253,7 +283,9 @@ private fun DuitApp(repository: FinanceRepository) {
                 workspaces = workspaces,
                 selectedId = workspaceId,
                 onWorkspaceSelected = { selectedWorkspaceId = it },
-                onAddWorkspace = { showWorkspaceDialog = true }
+                onAddWorkspace = { showWorkspaceDialog = true },
+                balancesVisible = balancesVisible,
+                onToggleBalances = { onBalancesVisibleChange(!balancesVisible) }
             )
         },
         bottomBar = {
@@ -366,12 +398,8 @@ private fun DuitApp(repository: FinanceRepository) {
                     accounts = accounts,
                     categories = categories,
                     onAdd = { showTransactionDialog = true },
-                    onExport = { rows ->
-                        pendingCsv = TransactionCsvExporter.toCsv(
-                            transactions = rows,
-                            accountNames = accounts.associate { it.id to it.name },
-                            categoryNames = categories.associate { it.id to it.name }
-                        )
+                    onExport = { request ->
+                        pendingCsvRequest = request
                         val fileStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
                         csvExportLauncher.launch("Duit-Transaksi-$fileStamp.csv")
                     },
@@ -705,7 +733,7 @@ private fun TransactionsScreen(
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
     onAdd: () -> Unit,
-    onExport: (List<TransactionEntity>) -> Unit,
+    onExport: (TransactionExportRequest) -> Unit,
     onVoid: (Long, String) -> Unit
 ) {
     val accountNames = accounts.associate { it.id to it.name }
@@ -743,14 +771,14 @@ private fun TransactionsScreen(
             "Nominal minimum tidak boleh melebihi nominal maksimum."
         else -> null
     }
-    val visible by remember(
+    val pagingTransactions = remember(
         workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
         categoryFilterId, minAmount, maxAmount, sortOrder, filterError
     ) {
         if (filterError != null) {
-            flowOf(emptyList())
+            flowOf(PagingData.empty<TransactionEntity>())
         } else {
-            repository.searchTransactions(
+            repository.pagedSearchTransactions(
                 workspaceId = workspaceId,
                 query = appliedSearchQuery,
                 type = typeFilter,
@@ -763,14 +791,11 @@ private fun TransactionsScreen(
                 sortOrder = sortOrder
             )
         }
-    }.collectAsState(initial = emptyList())
-    val groupedTransactions = remember(visible, sortOrder) {
-        if (sortOrder == "AMOUNT_ASC" || sortOrder == "AMOUNT_DESC") {
-            mapOf(Long.MIN_VALUE to visible)
-        } else {
-            visible.groupBy { transactionDayStart(it.occurredAt) }
-        }
-    }
+    }.collectAsLazyPagingItems()
+    val amountSort = sortOrder == "AMOUNT_ASC" || sortOrder == "AMOUNT_DESC"
+    val refreshError = pagingTransactions.loadState.refresh as? LoadState.Error
+    val appendError = pagingTransactions.loadState.append as? LoadState.Error
+    val isInitialLoading = pagingTransactions.loadState.refresh is LoadState.Loading && pagingTransactions.itemCount == 0
 
     Column(Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).padding(horizontal = 16.dp, vertical = 14.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -783,10 +808,27 @@ private fun TransactionsScreen(
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
-                onClick = { onExport(visible) },
-                enabled = visible.isNotEmpty() && filterError == null,
+                onClick = {
+                    onExport(
+                        TransactionExportRequest(
+                            workspaceId = workspaceId,
+                            query = appliedSearchQuery,
+                            type = typeFilter,
+                            startAt = dateBounds!!.startAt,
+                            endAt = dateBounds!!.endAt,
+                            accountId = accountFilterId.takeIf { it != 0L },
+                            categoryId = categoryFilterId.takeIf { it != 0L },
+                            minAmount = minAmount,
+                            maxAmount = maxAmount,
+                            sortOrder = sortOrder,
+                            accountNames = accountNames,
+                            categoryNames = categoryNames
+                        )
+                    )
+                },
+                enabled = pagingTransactions.itemCount > 0 && filterError == null,
                 modifier = Modifier.weight(1f)
-            ) { Text("Ekspor CSV") }
+            ) { Text("Ekspor seluruh hasil") }
             Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
@@ -832,7 +874,7 @@ private fun TransactionsScreen(
             )
             Spacer(Modifier.weight(1f))
             Text(
-                "${visible.size} hasil • maksimal 500",
+                "${pagingTransactions.itemCount} dimuat • halaman otomatis",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -921,7 +963,21 @@ private fun TransactionsScreen(
         Spacer(Modifier.height(8.dp))
         if (filterError != null) {
             DuitEmptyState(title = "Filter belum valid", message = filterError, icon = Icons.Filled.Info)
-        } else if (visible.isEmpty()) {
+        } else if (isInitialLoading) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularProgressIndicator()
+                    Text("Memuat transaksi dari penyimpanan lokal…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else if (refreshError != null && pagingTransactions.itemCount == 0) {
+            DuitEmptyState(
+                title = "Transaksi tidak dapat dimuat",
+                message = refreshError.error.message ?: "Terjadi kendala saat membaca histori transaksi.",
+                icon = Icons.Filled.Info,
+                action = { OutlinedButton(onClick = { pagingTransactions.retry() }) { Text("Coba lagi") } }
+            )
+        } else if (pagingTransactions.itemCount == 0) {
             if (!hasTransactions) {
                 DuitEmptyState(
                     title = "Belum ada transaksi",
@@ -938,7 +994,8 @@ private fun TransactionsScreen(
             }
         } else {
             Text(
-                "Dikelompokkan berdasarkan tanggal • hingga 500 hasil terbaru yang cocok",
+                if (amountSort) "Urutan berdasarkan nominal • data dimuat bertahap"
+                else "Dikelompokkan berdasarkan tanggal • muat otomatis saat digulir",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -946,17 +1003,33 @@ private fun TransactionsScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                groupedTransactions.forEach { (day, rows) ->
-                    item(key = "transaction-day-$day") {
-                        Text(
-                            if (day == Long.MIN_VALUE) "Urutan berdasarkan nominal" else transactionDayLabel(day),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-                        )
-                    }
-                    items(rows, key = { it.id }) { item ->
+                items(
+                    count = pagingTransactions.itemCount,
+                    key = { index -> pagingTransactions.peek(index)?.id ?: "transaction-placeholder-$index" }
+                ) { index ->
+                    val item = pagingTransactions[index]
+                    if (item != null) {
+                        val currentDay = transactionDayStart(item.occurredAt)
+                        val previousDay = if (!amountSort && index > 0) {
+                            pagingTransactions.peek(index - 1)?.occurredAt?.let(::transactionDayStart)
+                        } else null
+                        if (amountSort && index == 0) {
+                            Text(
+                                "Urutan berdasarkan nominal",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                        } else if (!amountSort && (index == 0 || previousDay != currentDay)) {
+                            Text(
+                                transactionDayLabel(currentDay),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                        }
                         DuitTransactionTile(
                             item = item,
                             accountName = accountNames[item.fromAccountId],
@@ -965,6 +1038,26 @@ private fun TransactionsScreen(
                             onClick = { selectedDetails = item },
                             onVoid = { selectedToVoid = item }
                         )
+                    }
+                }
+                if (pagingTransactions.loadState.append is LoadState.Loading) {
+                    item(key = "transaction-append-loading") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(14.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Memuat halaman berikutnya…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                if (appendError != null) {
+                    item(key = "transaction-append-error") {
+                        OutlinedButton(onClick = { pagingTransactions.retry() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Gagal memuat berikutnya • ketuk untuk mencoba lagi")
+                        }
                     }
                 }
             }
@@ -1264,7 +1357,7 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
                 "Transfer mengurangi akun sumber dan menambah akun tujuan. Transfer tidak dianggap pendapatan atau biaya.",
                 AppTab.TRANSACTIONS, "Buka Transaksi"),
             GuideEntry("Transaksi", "Cari dan ekspor transaksi",
-                "Gunakan pencarian dan filter tanggal, akun, kategori, nominal, serta jenis. CSV mengekspor hasil yang sedang tampil, maksimal 500 transaksi; bukan backup database.",
+                "Gunakan pencarian dan filter tanggal, akun, kategori, nominal, serta jenis. CSV mengekspor seluruh hasil filter aktif secara bertahap; bukan backup database.",
                 AppTab.TRANSACTIONS, "Buka Transaksi"),
             GuideEntry("Perencanaan", "Buat anggaran",
                 "Anggaran membandingkan batas dengan transaksi pengeluaran yang cocok. Realisasi dan sisa dihitung dari transaksi tersimpan.",
@@ -1278,8 +1371,14 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
             GuideEntry("Aset", "Kelola utang dan piutang",
                 "Pembayaran utang mengurangi saldo akun dan kewajiban. Piutang menambah saldo akun hanya ketika penerimaan benar-benar dicatat.",
                 AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Keamanan", "Sembunyikan nominal di layar",
+                "Ketuk ikon mata di header untuk menyamarkan nominal pada ringkasan, transaksi, perencanaan, dan aset. Pengaturan tampilan disimpan lokal; ini bukan kunci aplikasi atau enkripsi database.",
+                AppTab.DASHBOARD, "Buka Ringkasan"),
+            GuideEntry("Dashboard", "Atur widget ringkasan",
+                "Gunakan ikon pengaturan pada header dashboard untuk menampilkan atau menyembunyikan tren arus kas, rekening, rencana, peringatan, jatuh tempo, dan aktivitas terbaru.",
+                AppTab.DASHBOARD, "Buka Ringkasan"),
             GuideEntry("Keamanan", "Penyimpanan offline dan cadangan",
-                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV bukan pengganti backup.",
+                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV dapat menulis seluruh transaksi yang cocok, tetapi bukan pengganti backup database.",
                 AppTab.GUIDE, "Tetap di Panduan")
         )
     }
@@ -1364,7 +1463,7 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
         )
         GuideCard(
             "Apakah ekspor CSV mencadangkan seluruh aplikasi?",
-            "Tidak. CSV hanya menyalin hasil transaksi yang sedang tampil, maksimal 500 baris. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
+            "Tidak. CSV menulis seluruh hasil transaksi yang cocok dengan filter aktif secara bertahap. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
         )
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
@@ -1756,7 +1855,9 @@ private fun currentMonthBounds(): Pair<Long, Long> {
     return startMillis to start.timeInMillis
 }
 
+@Composable
 private fun formatRupiah(value: Long): String {
+    if (!LocalDuitBalancesVisible.current) return "••••••"
     val formatter = NumberFormat.getCurrencyInstance(Locale("id", "ID"))
     formatter.currency = Currency.getInstance("IDR")
     formatter.maximumFractionDigits = 0
