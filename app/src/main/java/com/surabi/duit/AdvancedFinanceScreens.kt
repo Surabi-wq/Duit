@@ -183,7 +183,7 @@ private fun GoalProgressCard(
 ) {
     val progress = (goal.savedMinor.toDouble() / goal.targetMinor.toDouble()).coerceIn(0.0, 1.0).toFloat()
     val remaining = (goal.targetMinor - goal.savedMinor).coerceAtLeast(0L)
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 androidx.compose.material3.Icon(Icons.Filled.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -206,6 +206,10 @@ private fun GoalProgressCard(
                 Spacer(Modifier.weight(1f))
                 Text("${(progress * 100).toInt()}%", fontWeight = FontWeight.SemiBold)
             }
+            goal.targetDate?.let {
+                Text("Tanggal target: ${financeDate(it)}", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onContribute, modifier = Modifier.weight(1f)) {
                     androidx.compose.material3.Icon(Icons.Filled.ArrowUpward, contentDescription = null)
@@ -226,9 +230,14 @@ private fun GoalProgressCard(
 private fun BudgetProgressCardAdvanced(budget: BudgetOverviewRow) {
     val ratio = if (budget.limitMinor > 0L) budget.spentMinor.toDouble() / budget.limitMinor.toDouble() else 0.0
     val remaining = budget.limitMinor - budget.spentMinor
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(budget.name, fontWeight = FontWeight.SemiBold)
+            Text(
+                "${financeDate(budget.periodStart)} – ${financeDate(budget.periodEnd)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(financeRupiah(budget.spentMinor), fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
@@ -239,236 +248,17 @@ private fun BudgetProgressCardAdvanced(budget: BudgetOverviewRow) {
                 modifier = Modifier.fillMaxWidth(),
                 color = if (ratio >= 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
             )
-            Text(
-                if (remaining >= 0L) "Sisa ${financeRupiah(remaining)}" else "Melebihi batas ${financeRupiah(-remaining)}",
-                color = if (remaining >= 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.labelMedium
-            )
-        }
-    }
-}
-
-@Composable
-fun WealthScreen(
-    accounts: List<AccountBalanceRow>,
-    goals: List<GoalOverviewRow>,
-    assets: List<AssetEntity>,
-    receivables: List<ReceivableOverviewRow>,
-    liabilities: List<LiabilityOverviewRow>,
-    onAddAccount: () -> Unit,
-    onSetAccountMinimumBalance: (AccountBalanceRow) -> Unit,
-    onAddAsset: () -> Unit,
-    onAddReceivable: () -> Unit,
-    onCollectReceivable: (ReceivableOverviewRow) -> Unit,
-    onAddLiability: () -> Unit,
-    onPayLiability: (LiabilityOverviewRow) -> Unit,
-    onUpdateAsset: (AssetEntity) -> Unit
-) {
-    var section by remember { mutableStateOf("ACCOUNTS") }
-    val accountsTotal = accounts.sumOf { it.balanceMinor }
-    val reservedGoals = goals.sumOf { it.savedMinor }
-    val assetsTotal = assets.sumOf { it.currentValueMinor }
-    val receivablesTotal = receivables.sumOf { it.outstandingMinor }
-    val debtTotal = liabilities.sumOf { it.outstandingMinor }
-    val netWorth = accountsTotal + reservedGoals + assetsTotal + receivablesTotal - debtTotal
-
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        DuitPageHeader(
-            title = "Aset dan kewajiban",
-            subtitle = "Saldo, kekayaan bersih, serta komitmen keuangan"
-        )
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Estimasi kekayaan bersih terdata", style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(financeRupiah(netWorth), style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Saldo akun + dana target + aset non-tunai + piutang − utang",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                DuitMetricCard("Saldo akun", financeRupiah(accountsTotal), Modifier.weight(1f), MaterialTheme.colorScheme.primary)
-                DuitMetricCard("Dana target", financeRupiah(reservedGoals), Modifier.weight(1f), MaterialTheme.colorScheme.secondary)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                DuitMetricCard("Aset dan piutang", financeRupiah(assetsTotal + receivablesTotal), Modifier.weight(1f), MaterialTheme.colorScheme.tertiary)
-                DuitMetricCard("Sisa kewajiban", financeRupiah(debtTotal), Modifier.weight(1f), MaterialTheme.colorScheme.error)
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            FilterChip(selected = section == "ACCOUNTS", onClick = { section = "ACCOUNTS" }, label = { Text("Akun (${accounts.size})") })
-            FilterChip(selected = section == "ASSETS", onClick = { section = "ASSETS" }, label = { Text("Aset (${assets.size})") })
-            FilterChip(selected = section == "RECEIVABLES", onClick = { section = "RECEIVABLES" }, label = { Text("Piutang (${receivables.size})") })
-            FilterChip(selected = section == "LIABILITIES", onClick = { section = "LIABILITIES" }, label = { Text("Utang (${liabilities.size})") })
-        }
-
-        when (section) {
-            "ACCOUNTS" -> {
-                DuitSectionHeader(
-                    title = "Dompet dan rekening",
-                    subtitle = "Saldo dihitung dari saldo awal dan transaksi yang tersimpan",
-                    trailing = { Button(onClick = onAddAccount) { Text("Tambah") } }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (remaining >= 0L) "Sisa ${financeRupiah(remaining)}" else "Melebihi batas ${financeRupiah(-remaining)}",
+                    color = if (remaining >= 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.weight(1f)
                 )
-                if (accounts.isEmpty()) {
-                    DuitEmptyState(
-                        title = "Belum ada akun",
-                        message = "Tambahkan dompet tunai, rekening bank, tabungan, atau e-wallet.",
-                        icon = Icons.Filled.AccountBalanceWallet,
-                        action = { Button(onClick = onAddAccount) { Text("Tambah akun") } }
-                    )
-                }
-                accounts.forEach { account ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                        Row(
-                            Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(account.name, fontWeight = FontWeight.SemiBold)
-                                Text(account.type.replace('_', ' '), style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(
-                                    if (account.minimumBalanceMinor > 0L) "Batas minimum: ${financeRupiah(account.minimumBalanceMinor)}"
-                                    else "Peringatan saldo minimum tidak aktif",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (account.minimumBalanceMinor > 0L && account.balanceMinor < account.minimumBalanceMinor) {
-                                    Text("Saldo di bawah batas minimum", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.error)
-                                }
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(financeRupiah(account.balanceMinor), fontWeight = FontWeight.Bold)
-                                TextButton(onClick = { onSetAccountMinimumBalance(account) }) { Text("Atur batas") }
-                            }
-                        }
-                    }
-                }
-            }
-            "ASSETS" -> {
-                DuitSectionHeader(
-                    title = "Aset non-tunai",
-                    subtitle = "Kendaraan, properti, tanah, emas, elektronik, dan peralatan",
-                    trailing = { Button(onClick = onAddAsset) { Text("Tambah") } }
-                )
-                if (assets.isEmpty()) {
-                    DuitEmptyState(
-                        title = "Belum ada aset non-tunai",
-                        message = "Catat barang bernilai yang dimiliki. Jangan masukkan saldo rekening atau dompet lagi karena sudah dihitung sebagai akun.",
-                        icon = Icons.Filled.HomeWork,
-                        action = { Button(onClick = onAddAsset) { Text("Catat aset") } }
-                    )
-                }
-                assets.forEach { asset ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(asset.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                Text(financeRupiah(asset.currentValueMinor), fontWeight = FontWeight.Bold)
-                            }
-                            Text(
-                                "${asset.category.replace('_', ' ')} • Harga perolehan ${financeRupiah(asset.acquisitionCostMinor)}",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text("Nilai diperbarui: ${financeDate(asset.updatedAt)}",
-                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            OutlinedButton(onClick = { onUpdateAsset(asset) }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Perbarui nilai aset")
-                            }
-                        }
-                    }
-                }
-            }
-            "RECEIVABLES" -> {
-                DuitSectionHeader(
-                    title = "Piutang dan tagihan",
-                    subtitle = "Saldo akun bertambah hanya saat pembayaran diterima",
-                    trailing = { Button(onClick = onAddReceivable) { Text("Tambah") } }
-                )
-                if (receivables.isEmpty()) {
-                    DuitEmptyState(
-                        title = "Belum ada piutang",
-                        message = "Catat tagihan pelanggan atau uang yang harus diterima.",
-                        icon = Icons.Filled.TrendingUp,
-                        action = { Button(onClick = onAddReceivable) { Text("Tambah piutang") } }
-                    )
-                }
-                receivables.forEach { receivable ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(receivable.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                Text(financeRupiah(receivable.outstandingMinor), fontWeight = FontWeight.Bold,
-                                    color = if (receivable.outstandingMinor == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary)
-                            }
-                            Text("Pihak: ${receivable.counterparty} • Nilai awal ${financeRupiah(receivable.originalAmountMinor)}",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            receivable.dueAt?.let { Text("Jatuh tempo: ${financeDate(it)}", style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            if (receivable.outstandingMinor == 0L) {
-                                Text("Lunas", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            } else {
-                                OutlinedButton(onClick = { onCollectReceivable(receivable) }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Catat penerimaan")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            else -> {
-                DuitSectionHeader(
-                    title = "Utang dan kewajiban",
-                    subtitle = "Pembayaran pokok mengurangi saldo akun dan sisa kewajiban",
-                    trailing = { Button(onClick = onAddLiability) { Text("Tambah") } }
-                )
-                if (liabilities.isEmpty()) {
-                    DuitEmptyState(
-                        title = "Tidak ada utang tercatat",
-                        message = "Catat pinjaman atau kewajiban yang masih harus dibayar.",
-                        icon = Icons.Filled.Assessment,
-                        action = { Button(onClick = onAddLiability) { Text("Tambah utang") } }
-                    )
-                }
-                liabilities.forEach { debt ->
-                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(debt.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                Text(financeRupiah(debt.outstandingMinor), fontWeight = FontWeight.Bold,
-                                    color = if (debt.outstandingMinor == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                            }
-                            Text("Pemberi pinjaman: ${debt.counterparty} • Nilai awal ${financeRupiah(debt.originalAmountMinor)}",
-                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            debt.dueAt?.let { Text("Jatuh tempo: ${financeDate(it)}", style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                            if (debt.outstandingMinor == 0L) {
-                                Text("Lunas", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                            } else {
-                                OutlinedButton(onClick = { onPayLiability(debt) }, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Catat pembayaran")
-                                }
-                            }
-                        }
-                    }
-                }
+                Text("${(ratio * 100).toInt()}% terpakai", style = MaterialTheme.typography.labelSmall,
+                    color = if (ratio >= 1.0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Spacer(Modifier.height(20.dp))
     }
 }
 
