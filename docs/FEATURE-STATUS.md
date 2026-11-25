@@ -24,7 +24,7 @@ Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ### Anggaran dan tujuan
 - Anggaran bulanan umum atau kategori pengeluaran.
-- Target tabungan dengan nilai tujuan dan prioritas.
+- Target tabungan dengan nilai tujuan, prioritas, dan tanggal target opsional yang disimpan ke database.
 - Setoran target mengurangi saldo akun yang dipilih; penarikan target menambahnya kembali.
 - Nilai target tersimpan berdasarkan transaksi setoran/penarikan, tidak disimpan sebagai angka yang dapat menyimpang dari histori.
 
