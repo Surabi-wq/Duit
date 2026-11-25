@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **0.2.0**
+- Versi: **0.3.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -76,7 +76,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-CI di GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama `Duit-0.2.0.apk`.
+CI di GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama `Duit-0.3.0.apk`.
 
 ## Signing dan distribusi
 
@@ -84,8 +84,8 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room saat ini berada pada versi 2 dengan migrasi eksplisit dari versi 1. Jangan gunakan destructive migration pada data pengguna. Sebelum penggunaan produksi, jalankan tes upgrade database dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Fitur backup/restore belum tersedia pada 0.2.0.
+Database Room saat ini berada pada versi 2 dengan migrasi eksplisit dari versi 1. Jangan gunakan destructive migration pada data pengguna. Sebelum penggunaan produksi, jalankan tes upgrade database dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Fitur backup/restore belum tersedia pada 0.3.0.
 
 ## Pengujian yang telah dilakukan
 
-CI versi 0.2.0 telah lulus `testDebugUnitTest` dan `assembleRelease`. Pengujian instalasi/upgrade dan alur UI pada perangkat Android fisik belum dilakukan dalam CI. Keberhasilan build bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai.
+CI versi 0.3.0 telah lulus `testDebugUnitTest` dan `assembleRelease`. Pengujian instalasi/upgrade dan alur UI pada perangkat Android fisik belum dilakukan dalam CI. Keberhasilan build bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai.
