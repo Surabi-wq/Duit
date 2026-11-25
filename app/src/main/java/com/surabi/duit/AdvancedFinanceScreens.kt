@@ -1,6 +1,7 @@
 package com.surabi.duit
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -76,12 +78,21 @@ fun PlanningScreen(
     val remainingBudget = budgetTotal - spentTotal
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp, vertical = 17.dp),
+        verticalArrangement = Arrangement.spacedBy(17.dp)
     ) {
         DuitPageHeader(
-            title = "Perencanaan",
-            subtitle = "Pantau target tabungan dan kendali pengeluaran"
+            title = "Rencana keuangan",
+            subtitle = "Atur tujuan, jaga anggaran, ukur kemajuan"
+        )
+
+        DuitFeatureBanner(
+            kicker = "DANA TARGET TERKUMPUL",
+            value = financeRupiah(savedTotal),
+            supporting = "Sisa seluruh target ${financeRupiah(remainingTotal)}",
+            actionLabel = "Buat target",
+            onAction = onAddGoal
         )
 
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
@@ -188,24 +199,31 @@ private fun GoalProgressCard(
     val remaining = (goal.targetMinor - goal.savedMinor).coerceAtLeast(0L)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(Icons.Filled.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
-                Text(goal.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("Prioritas ${goal.priority}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.size(42.dp).background(Color(0xFFE5F3EB), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.Icon(Icons.Filled.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(goal.name, fontWeight = FontWeight.Bold)
+                    Text("Prioritas ${goal.priority}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                }
+                Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
             }
+            Text(financeRupiah(goal.savedMinor), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(financeRupiah(goal.savedMinor), fontWeight = FontWeight.Bold)
+                Text("Dana terkumpul", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.weight(1f))
-                Text("Target ${financeRupiah(goal.targetMinor)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Target ${financeRupiah(goal.targetMinor)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (remaining == 0L) "Target tercapai" else "Kurang ${financeRupiah(remaining)}",
@@ -302,17 +320,18 @@ fun WealthScreen(
     val netWorth = accountTotal + goalTotal + assetTotal + receivableTotal - debtTotal
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
+            .padding(horizontal = 17.dp, vertical = 17.dp),
+        verticalArrangement = Arrangement.spacedBy(15.dp)
     ) {
         DuitPageHeader(
             title = "Aset dan kewajiban",
-            subtitle = "Saldo, kekayaan bersih, serta komitmen keuangan"
+            subtitle = "Peta kekayaan dan seluruh komitmen keuangan"
         )
-        DuitBalanceHero(
-            title = "KEKAYAAN BERSIH TERDATA",
+        DuitFeatureBanner(
+            kicker = "KEKAYAAN BERSIH TERDATA",
             value = financeRupiah(netWorth),
-            supporting = "Estimasi dari seluruh data workspace"
+            supporting = "Saldo akun + dana target + aset non-tunai + piutang − sisa utang"
         )
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
