@@ -1,11 +1,11 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.3.0**. Repositori dimulai dari kondisi kosong dan dikembangkan sebagai aplikasi Android lokal/offline.
+Versi source saat ini: **0.4.0**. Repositori dimulai dari kondisi kosong dan dikembangkan sebagai aplikasi Android lokal/offline.
 
 ## Sudah memiliki alur kerja nyata
 
 ### Dashboard, workspace, dan akun
-- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, dan estimasi kekayaan bersih.
+- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
 - Akun dapat berupa tunai, bank, tabungan, e-wallet, kartu kredit, investasi, atau lainnya.
@@ -35,6 +35,11 @@ Versi source saat ini: **0.3.0**. Repositori dimulai dari kondisi kosong dan dik
 - Pembayaran utang mengurangi saldo akun dan sisa utang secara atomik.
 - Kekayaan bersih terdata = saldo akun + dana target + nilai aset non-tunai − sisa utang.
 
+### Peringatan keuangan dashboard
+- Mesin aturan lokal mengevaluasi saldo negatif, saldo di bawah batas minimum akun, realisasi anggaran (peringatan mulai 80% dan kritis saat terlampaui), arus kas bulanan negatif, serta utang/piutang yang sudah melewati jatuh tempo.
+- Peringatan dihitung dari data workspace aktif; tidak mengubah transaksi atau saldo.
+- Peringatan dibatasi pada lima item teratas agar dashboard tetap ringkas.
+
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
 - Migrasi database versi 1 ke versi 2 dan versi 2 ke versi 3; tidak memakai destructive migration.
@@ -42,7 +47,7 @@ Versi source saat ini: **0.3.0**. Repositori dimulai dari kondisi kosong dan dik
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
 - CI menjalankan unit test dan build APK Release.
 
-## Aturan akuntansi penting pada versi 0.3.0
+## Aturan akuntansi penting pada versi 0.4.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
