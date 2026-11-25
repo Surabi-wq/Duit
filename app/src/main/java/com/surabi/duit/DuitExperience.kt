@@ -241,6 +241,7 @@ internal fun DuitDashboardScreen(
     onOpenTransactions: () -> Unit
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
+    val balancesVisible = LocalDuitBalancesVisible.current
     val context = LocalContext.current
     val widgetPreferences = remember {
         context.getSharedPreferences("duit-dashboard-widgets", Context.MODE_PRIVATE)
@@ -357,7 +358,11 @@ internal fun DuitDashboardScreen(
                         Icon(Icons.Filled.Info, contentDescription = "Peringatan", tint = if (isCritical) DuitRed else DuitAmber)
                         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(alert.title, fontWeight = FontWeight.Bold, color = DuitInk)
-                            Text(alert.message, style = MaterialTheme.typography.bodySmall, color = DuitMuted)
+                            Text(
+                                if (balancesVisible) alert.message else "Rincian nominal disembunyikan. Tampilkan saldo untuk melihat nilainya.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DuitMuted
+                            )
                         }
                     }
                 }
