@@ -3,6 +3,7 @@ package com.surabi.duit
 import android.os.Bundle
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -225,6 +226,11 @@ private fun DuitApp(
     var selectedReceivableCollection by remember { mutableStateOf<ReceivableOverviewRow?>(null) }
     var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
     var selectedAccountForMinimum by remember { mutableStateOf<AccountBalanceRow?>(null) }
+
+    // System back from a top-level destination returns to the dashboard instead of exiting the app.
+    BackHandler(enabled = selectedTab != AppTab.DASHBOARD) {
+        selectedTab = AppTab.DASHBOARD
+    }
 
     LaunchedEffect(initializationAttempt) {
         databaseReady = false
