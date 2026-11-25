@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -89,10 +90,12 @@ import com.surabi.duit.data.GoalOverviewRow
 import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
+import com.surabi.duit.data.TransactionDateRange
 import com.surabi.duit.data.TransactionCsvExporter
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.NumberFormat
@@ -753,30 +756,68 @@ private fun TransactionsScreen(
 ) {
     val accountNames = accounts.associate { it.id to it.name }
     val categoryNames = categories.associate { it.id to it.name }
-    var searchQuery by remember { mutableStateOf("") }
-    var typeFilter by remember { mutableStateOf("ALL") }
+    var searchQuery by remember(workspaceId) { mutableStateOf("") }
+    var typeFilter by remember(workspaceId) { mutableStateOf("ALL") }
+    var showAdvancedFilters by remember(workspaceId) { mutableStateOf(false) }
+    var startDateText by remember(workspaceId) { mutableStateOf("") }
+    var endDateText by remember(workspaceId) { mutableStateOf("") }
+    var minAmountText by remember(workspaceId) { mutableStateOf("") }
+    var maxAmountText by remember(workspaceId) { mutableStateOf("") }
+    var accountFilterId by remember(workspaceId) { mutableLongStateOf(0L) }
+    var categoryFilterId by remember(workspaceId) { mutableLongStateOf(0L) }
+    var sortOrder by remember(workspaceId) { mutableStateOf("NEWEST") }
     var selectedToVoid by remember { mutableStateOf<TransactionEntity?>(null) }
     var voidReason by remember { mutableStateOf("") }
-    val visible by remember(workspaceId, searchQuery, typeFilter) {
-        repository.searchTransactions(
-            workspaceId = workspaceId,
-            query = searchQuery,
-            type = typeFilter,
-            startAt = 0L,
-            endAt = Long.MAX_VALUE
-        )
+
+    val dateBounds = remember(startDateText, endDateText) {
+        TransactionDateRange.parse(startDateText, endDateText)
+    }
+    val minAmount = minAmountText.takeIf { it.isNotBlank() }?.toLongOrNull()
+    val maxAmount = maxAmountText.takeIf { it.isNotBlank() }?.toLongOrNull()
+    val filterError = when {
+        dateBounds == null -> "Tanggal tidak valid atau tanggal awal melebihi tanggal akhir. Gunakan format dd-MM-yyyy."
+        minAmountText.isNotBlank() && minAmount == null -> "Nominal minimum terlalu besar."
+        maxAmountText.isNotBlank() && maxAmount == null -> "Nominal maksimum terlalu besar."
+        minAmount != null && maxAmount != null && minAmount > maxAmount ->
+            "Nominal minimum tidak boleh melebihi nominal maksimum."
+        else -> null
+    }
+    val visible by remember(
+        workspaceId, searchQuery, typeFilter, dateBounds, accountFilterId,
+        categoryFilterId, minAmount, maxAmount, sortOrder, filterError
+    ) {
+        if (filterError != null) {
+            flowOf(emptyList())
+        } else {
+            repository.searchTransactions(
+                workspaceId = workspaceId,
+                query = searchQuery,
+                type = typeFilter,
+                startAt = dateBounds!!.startAt,
+                endAt = dateBounds!!.endAt,
+                accountId = accountFilterId.takeIf { it != 0L },
+                categoryId = categoryFilterId.takeIf { it != 0L },
+                minAmount = minAmount,
+                maxAmount = maxAmount,
+                sortOrder = sortOrder
+            )
+        }
     }.collectAsState(initial = emptyList())
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Semua transaksi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("${visible.size} hasil • pencarian database, maksimal 500 transaksi terbaru",
+                Text("Pencarian dan filter langsung pada database",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { onExport(visible) }, enabled = visible.isNotEmpty(), modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = { onExport(visible) },
+                enabled = visible.isNotEmpty() && filterError == null,
+                modifier = Modifier.weight(1f)
+            ) {
                 Text("Ekspor CSV")
             }
             Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
@@ -794,21 +835,128 @@ private fun TransactionsScreen(
             modifier = Modifier.fillMaxWidth()
         )
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            listOf("ALL" to "Semua", "INCOME" to "Masuk", "EXPENSE" to "Keluar",
-                "TRANSFER" to "Transfer", "OTHER" to "Lainnya").forEach { (key, label) ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+        ) {
+            listOf(
+                "ALL" to "Semua",
+                "INCOME" to "Masuk",
+                "EXPENSE" to "Keluar",
+                "TRANSFER" to "Transfer",
+                "OTHER" to "Lainnya"
+            ).forEach { (key, label) ->
                 FilterChip(selected = typeFilter == key, onClick = { typeFilter = key }, label = { Text(label) })
             }
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FilterChip(
+                selected = showAdvancedFilters,
+                onClick = { showAdvancedFilters = !showAdvancedFilters },
+                label = { Text(if (showAdvancedFilters) "Tutup filter lanjutan" else "Filter lanjutan") }
+            )
+            Spacer(Modifier.weight(1f))
+            Text(
+                "${visible.size} hasil • maksimal 500",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        if (showAdvancedFilters) {
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 330.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = startDateText,
+                        onValueChange = { startDateText = it.take(10) },
+                        label = { Text("Dari (dd-MM-yyyy)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = endDateText,
+                        onValueChange = { endDateText = it.take(10) },
+                        label = { Text("Sampai (dd-MM-yyyy)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = minAmountText,
+                        onValueChange = { minAmountText = it.filter(Char::isDigit) },
+                        label = { Text("Nominal minimum") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = maxAmountText,
+                        onValueChange = { maxAmountText = it.filter(Char::isDigit) },
+                        label = { Text("Nominal maksimum") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                IdDropdown(
+                    label = "Akun",
+                    selectedId = accountFilterId,
+                    options = listOf(0L to "Semua akun") + accounts.map { it.id to it.name },
+                    onSelected = { accountFilterId = it }
+                )
+                IdDropdown(
+                    label = "Kategori",
+                    selectedId = categoryFilterId,
+                    options = listOf(0L to "Semua kategori") + categories.map { it.id to it.name },
+                    onSelected = { categoryFilterId = it }
+                )
+                ChoiceDropdown(
+                    label = "Urutkan",
+                    selected = sortOrder,
+                    options = listOf(
+                        "NEWEST" to "Tanggal terbaru",
+                        "OLDEST" to "Tanggal terlama",
+                        "AMOUNT_ASC" to "Nominal terkecil",
+                        "AMOUNT_DESC" to "Nominal terbesar"
+                    ),
+                    onSelected = { sortOrder = it }
+                )
+                if (filterError != null) {
+                    Text(filterError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(
+                    onClick = {
+                        startDateText = ""
+                        endDateText = ""
+                        minAmountText = ""
+                        maxAmountText = ""
+                        accountFilterId = 0L
+                        categoryFilterId = 0L
+                        sortOrder = "NEWEST"
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Hapus filter lanjutan")
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
-        if (visible.isEmpty()) {
+        if (filterError != null) {
+            EmptyHint("Filter belum valid", filterError)
+        } else if (visible.isEmpty()) {
             EmptyHint(
                 title = if (!hasTransactions) "Belum ada transaksi" else "Transaksi tidak ditemukan",
                 body = if (!hasTransactions) "Transaksi yang Anda simpan akan muncul di halaman ini."
-                    else "Ubah kata pencarian atau filter jenis transaksi."
+                    else "Ubah kata pencarian atau filter transaksi."
             )
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 items(visible, key = { it.id }) { item ->
                     TransactionCard(
                         item,
@@ -1014,7 +1162,8 @@ private fun GuideScreen() {
         GuideCard("2. Tambahkan akun", "Buat dompet tunai, rekening bank, tabungan, atau e-wallet. Saldo awal menjadi titik awal perhitungan saldo.")
         GuideCard("3. Catat transaksi", "Pilih pemasukan, pengeluaran, atau transfer. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.")
         GuideCard("4. Pantau anggaran", "Buat batas pengeluaran bulanan. Realisasi anggaran dihitung dari transaksi pengeluaran yang tersimpan.")
-        GuideCard("Pencarian dan ekspor", "Halaman Transaksi mencari langsung di database berdasarkan keterangan, catatan, kategori, dan jenis transaksi. Hasil yang ditemukan dapat diekspor ke CSV melalui penyimpanan perangkat; ekspor mengikuti hasil pencarian dan dibatasi maksimal 500 transaksi terbaru.")
+        GuideCard("5. Saring transaksi", "Di halaman Transaksi, cari keterangan atau catatan, lalu gunakan Filter lanjutan untuk menyaring tanggal, akun, kategori, nominal minimum/maksimum, dan urutan hasil. Tanggal akhir mencakup seluruh hari yang dipilih.")
+        GuideCard("6. Ekspor CSV", "Ekspor CSV menyimpan hasil pencarian dan filter yang sedang tampil, maksimal 500 transaksi terbaru. Ekspor CSV bukan backup penuh database.")
         GuideCard("Penyimpanan dan privasi", "Data inti disimpan lokal pada perangkat menggunakan Room/SQLite. Alur utama tidak memerlukan internet. Backup dan restore mandiri terenkripsi belum tersedia, sehingga pengguna perlu menjaga data perangkat dan tidak menganggap ekspor CSV sebagai cadangan penuh database.")
         GuideCard("Fitur tahap berikutnya", "Jurnal akuntansi double-entry, rekonsiliasi, transaksi berulang, lampiran struk, impor file, ekspor PDF/Excel/DOCX, ERP, persediaan, investasi lengkap, pajak, OCR, analisis prediktif, multi-pengguna, enkripsi database, dan backup/restore masih dalam pengembangan.")
     }
