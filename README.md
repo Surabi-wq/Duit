@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **0.5.0**
+- Versi: **0.6.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -28,8 +28,10 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Transfer mengurangi akun sumber dan menambah akun tujuan tanpa mengubah total pemasukan/pengeluaran.
 - Validasi akun dan kategori memastikan relasi berada dalam workspace yang sama.
 - Pencarian transaksi dijalankan langsung pada SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi.
+- Filter lanjutan mencakup rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, serta pengurutan berdasarkan tanggal atau nominal.
+- Validasi tanggal menolak tanggal kalender yang tidak sah, teks tambahan, dan rentang tanggal terbalik.
 - Hasil pencarian menampilkan maksimal 500 transaksi terbaru yang cocok; filter jenis mencakup transaksi khusus seperti setoran target, pembayaran utang, dan penerimaan piutang.
-- Ekspor CSV menyimpan hasil pencarian yang sedang ditampilkan melalui pemilih lokasi simpan Android. Ekspor dibatasi maksimal 500 baris dan bukan pengganti backup database.
+- Ekspor CSV menyimpan hasil pencarian dan filter yang sedang ditampilkan melalui pemilih lokasi simpan Android. Ekspor dibatasi maksimal 500 baris dan bukan pengganti backup database.
 - Pembatalan transaksi menggunakan status void dengan alasan; histori tidak dihapus dan pembatalan dicatat pada audit log.
 
 ### Anggaran dan target tabungan
@@ -87,7 +89,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.5.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.6.0.apk**.
 
 ## Signing dan distribusi
 
@@ -95,7 +97,7 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.5.0.
+Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.6.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 
@@ -103,4 +105,4 @@ Ekspor hanya mencakup hasil pencarian yang ditampilkan (maksimal 500 transaksi t
 
 ## Pengujian dan batas verifikasi
 
-CI menjalankan `:app:testDebugUnitTest` dan `:app:assembleRelease`. Unit test mencakup parsing nominal Rupiah, aturan peringatan, serta escaping dan perlindungan formula pada ekspor CSV. Build yang berhasil bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai. Pengujian instalasi, upgrade database, alur UI, ekspor melalui Storage Access Framework, kinerja dataset besar, dan penggunaan offline tetap perlu diverifikasi pada perangkat Android fisik.
+CI menjalankan `:app:testDebugUnitTest` dan `:app:assembleRelease`. Unit test mencakup parsing nominal Rupiah, aturan peringatan, validasi rentang tanggal transaksi, serta escaping dan perlindungan formula pada ekspor CSV. Build yang berhasil bukan bukti bahwa seluruh kebutuhan enterprise A–Z telah selesai. Pengujian instalasi, upgrade database, alur UI, ekspor melalui Storage Access Framework, kinerja dataset besar, dan penggunaan offline tetap perlu diverifikasi pada perangkat Android fisik.
