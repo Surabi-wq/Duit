@@ -1,6 +1,6 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.5.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **0.6.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -13,8 +13,10 @@ Versi source saat ini: **0.5.0**. Repositori dikembangkan sebagai aplikasi Andro
 ### Transaksi dan kontrol data
 - Pemasukan, pengeluaran, dan transfer antar-akun.
 - Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi; hasil dibatasi 500 transaksi terbaru yang cocok.
-- Filter jenis mencakup pemasukan, pengeluaran, transfer, dan tipe khusus (misalnya setoran target, pembayaran utang, pencairan pinjaman, dan penerimaan piutang).
-- Ekspor CSV dari hasil pencarian yang sedang ditampilkan melalui Android Storage Access Framework; maksimal 500 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
+- Filter berdasarkan jenis, rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, dan pengurutan tanggal atau nominal.
+- Validasi rentang tanggal menolak tanggal kalender tidak valid, teks tambahan, dan rentang awal yang melebihi tanggal akhir.
+- Filter divalidasi pada repository dan query dijalankan pada database; pencarian tidak memuat seluruh histori transaksi ke memori.
+- Ekspor CSV dari hasil pencarian dan filter yang sedang ditampilkan melalui Android Storage Access Framework; maksimal 500 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
 - Pembatalan transaksi (void) dengan alasan yang tersimpan pada audit log; catatan transaksi tidak dihapus.
 - Validasi akun/kategori harus berasal dari workspace yang sama.
 - Semua insert yang terkait dilakukan dalam transaksi database Room.
@@ -49,7 +51,7 @@ Versi source saat ini: **0.5.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
 - CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, serta escaping dan perlindungan formula pada CSV.
 
-## Aturan akuntansi penting pada versi 0.5.0
+## Aturan akuntansi penting pada versi 0.6.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
