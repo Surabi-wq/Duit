@@ -359,6 +359,38 @@ internal fun DuitDashboardScreen(
 }
 
 @Composable
+internal fun DuitFeatureBanner(
+    kicker: String,
+    value: String,
+    supporting: String,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null
+) {
+    Box(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF073F32), Color(0xFF087C55), Color(0xFF245F91))))
+    ) {
+        Box(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp)
+            .size(100.dp).background(Color.White.copy(alpha = 0.07f), CircleShape))
+        Column(Modifier.fillMaxWidth().padding(19.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(kicker, color = Color(0xFFD5F2E4), style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+            Text(value, color = Color.White, style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(supporting, color = Color(0xFFD5F2E4), style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f))
+                if (actionLabel != null && onAction != null) {
+                    TextButton(onClick = onAction) {
+                        Text(actionLabel, color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun DuitAccountHero(totalBalance: Long, netWorth: Long, accountCount: Int, onDetails: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
