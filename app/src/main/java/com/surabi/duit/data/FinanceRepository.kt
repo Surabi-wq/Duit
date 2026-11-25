@@ -29,6 +29,7 @@ class FinanceRepository(private val database: FinanceDatabase) {
     fun goals(workspaceId: Long): Flow<List<GoalOverviewRow>> = dao.observeGoals(workspaceId)
     fun assets(workspaceId: Long): Flow<List<AssetEntity>> = dao.observeAssets(workspaceId)
     fun liabilities(workspaceId: Long): Flow<List<LiabilityOverviewRow>> = dao.observeLiabilities(workspaceId)
+    fun receivables(workspaceId: Long): Flow<List<ReceivableOverviewRow>> = dao.observeReceivables(workspaceId)
     fun searchTransactions(workspaceId: Long, query: String, type: String, startAt: Long, endAt: Long): Flow<List<TransactionEntity>> =
         dao.searchTransactions(workspaceId, query.trim(), type, startAt, endAt)
 
@@ -284,6 +285,85 @@ class FinanceRepository(private val database: FinanceDatabase) {
                     note = "Pencairan pinjaman dari $cleanCounterparty", occurredAt = now, createdAt = now))
             }
             dao.insertAuditLog(AuditLogEntity(workspaceId, "LIABILITY", id, "CREATE", "Mencatat utang $cleanName", now))
+            id
+        }
+    }
+
+    suspend fun createReceivable(
+        workspaceId: Long,
+        name: String,
+        counterparty: String,
+        originalAmount: Long,
+        dueAt: Long?,
+        notes: String
+    ): Long {
+        val cleanName = name.trim()
+        val cleanCounterparty = counterparty.trim()
+        require(cleanName.isNotEmpty()) { "Nama piutang atau tagihan wajib diisi." }
+        require(cleanName.length <= 80) { "Nama piutang maksimal 80 karakter." }
+        require(cleanCounterparty.isNotEmpty()) { "Nama pelanggan atau pihak yang berutang wajib diisi." }
+        require(cleanCounterparty.length <= 100) { "Nama pihak maksimal 100 karakter." }
+        require(originalAmount > 0L) { "Nilai piutang harus lebih besar dari nol." }
+        require(notes.length <= 500) { "Catatan maksimal 500 karakter." }
+        require(dao.getWorkspace(workspaceId) != null) { "Workspace tidak ditemukan." }
+
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val id = dao.insertReceivable(
+                ReceivableEntity(
+                    workspaceId = workspaceId,
+                    name = cleanName,
+                    counterparty = cleanCounterparty,
+                    originalAmountMinor = originalAmount,
+                    dueAt = dueAt,
+                    notes = notes.trim(),
+                    createdAt = now
+                )
+            )
+            dao.insertAuditLog(
+                AuditLogEntity(workspaceId, "RECEIVABLE", id, "CREATE",
+                    "Mencatat piutang $cleanName kepada $cleanCounterparty", now)
+            )
+            id
+        }
+    }
+
+    suspend fun collectReceivable(
+        workspaceId: Long,
+        receivableId: Long,
+        accountId: Long,
+        amount: Long,
+        note: String
+    ): Long {
+        require(amount > 0L) { "Nominal penerimaan harus lebih besar dari nol." }
+        require(note.length <= 500) { "Catatan maksimal 500 karakter." }
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val receivable = dao.getReceivable(receivableId, workspaceId)
+                ?: throw IllegalArgumentException("Piutang tidak ditemukan pada workspace ini.")
+            val account = dao.getAccount(accountId, workspaceId)
+                ?: throw IllegalArgumentException("Akun penerima tidak ditemukan pada workspace ini.")
+            val outstanding = dao.receivableOutstanding(receivable.id, workspaceId) ?: 0L
+            require(outstanding > 0L) { "Piutang ini sudah lunas." }
+            require(amount <= outstanding) { "Penerimaan melebihi sisa piutang." }
+
+            val id = dao.insertTransaction(
+                TransactionEntity(
+                    workspaceId = workspaceId,
+                    type = "RECEIVABLE_COLLECTION",
+                    title = "Penerimaan piutang: ${receivable.name}",
+                    amountMinor = amount,
+                    fromAccountId = account.id,
+                    note = note.trim(),
+                    occurredAt = now,
+                    createdAt = now,
+                    receivableId = receivable.id
+                )
+            )
+            dao.insertAuditLog(
+                AuditLogEntity(workspaceId, "RECEIVABLE", receivable.id, "COLLECTION",
+                    "Menerima ${amount} rupiah dari ${receivable.counterparty}", now)
+            )
             id
         }
     }
