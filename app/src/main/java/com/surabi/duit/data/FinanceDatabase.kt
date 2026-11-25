@@ -521,7 +521,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                         targetDate INTEGER,
                         priority INTEGER NOT NULL,
                         createdAt INTEGER NOT NULL,
-                        isArchived INTEGER NOT NULL DEFAULT 0,
+                        isArchived INTEGER NOT NULL,
                         FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """.trimIndent())
@@ -552,7 +552,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                         dueAt INTEGER,
                         notes TEXT NOT NULL,
                         createdAt INTEGER NOT NULL,
-                        isClosed INTEGER NOT NULL DEFAULT 0,
+                        isClosed INTEGER NOT NULL,
                         FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE
                     )
                 """.trimIndent())
