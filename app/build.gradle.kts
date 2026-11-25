@@ -11,8 +11,8 @@ android {
         applicationId = "com.surabi.duit"
         minSdk = 23
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.0.0"
+        versionCode = 11
+        versionName = "1.1.0"
     }
     buildTypes {
         debug {
@@ -54,7 +54,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.paging:paging-runtime:3.5.3")
+    implementation("androidx.paging:paging-compose:3.5.3")
     implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-paging:2.8.5")
     implementation("androidx.room:room-ktx:2.8.5")
     ksp("androidx.room:room-compiler:2.8.5")
     testImplementation("junit:junit:4.13.2")
