@@ -637,6 +637,53 @@ interface FinanceDao {
         sortOrder: String
     ): PagingSource<Int, TransactionEntity>
 
+    @Query("""
+        SELECT t.* FROM transactions AS t
+        WHERE t.workspaceId = :workspaceId AND t.isVoided = 0
+          AND (
+              :query = ''
+              OR t.title LIKE '%' || :query || '%'
+              OR t.note LIKE '%' || :query || '%'
+              OR EXISTS (
+                  SELECT 1 FROM categories AS c
+                  WHERE c.id = t.categoryId
+                    AND c.workspaceId = t.workspaceId
+                    AND c.name LIKE '%' || :query || '%'
+              )
+          )
+          AND (
+              :type = 'ALL'
+              OR (:type = 'OTHER' AND t.type NOT IN ('INCOME', 'EXPENSE', 'TRANSFER'))
+              OR t.type = :type
+          )
+          AND t.occurredAt BETWEEN :startAt AND :endAt
+          AND (:accountId IS NULL OR t.fromAccountId = :accountId OR t.toAccountId = :accountId)
+          AND (:categoryId IS NULL OR t.categoryId = :categoryId)
+          AND (:minAmount IS NULL OR t.amountMinor >= :minAmount)
+          AND (:maxAmount IS NULL OR t.amountMinor <= :maxAmount)
+        ORDER BY
+          CASE WHEN :sortOrder = 'OLDEST' THEN t.occurredAt END ASC,
+          CASE WHEN :sortOrder = 'AMOUNT_ASC' THEN t.amountMinor END ASC,
+          CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amountMinor END DESC,
+          t.occurredAt DESC,
+          t.id DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun exportSearchTransactionsPage(
+        workspaceId: Long,
+        query: String,
+        type: String,
+        startAt: Long,
+        endAt: Long,
+        accountId: Long?,
+        categoryId: Long?,
+        minAmount: Long?,
+        maxAmount: Long?,
+        sortOrder: String,
+        limit: Int,
+        offset: Int
+    ): List<TransactionEntity>
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertBudget(budget: BudgetEntity): Long
 
