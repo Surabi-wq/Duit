@@ -392,9 +392,15 @@ interface FinanceDao {
         SELECT * FROM transactions
         WHERE workspaceId = :workspaceId AND isVoided = 0
         ORDER BY occurredAt DESC, id DESC
-        LIMIT 200
+        LIMIT 20
     """)
     fun observeTransactions(workspaceId: Long): Flow<List<TransactionEntity>>
+
+    @Query("""
+        SELECT COUNT(*) FROM transactions
+        WHERE workspaceId = :workspaceId AND isVoided = 0
+    """)
+    fun observeTransactionCount(workspaceId: Long): Flow<Int>
 
     @Query("""
         SELECT COALESCE(SUM(amountMinor), 0) FROM transactions
@@ -572,9 +578,9 @@ interface FinanceDao {
           CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amountMinor END DESC,
           t.occurredAt DESC,
           t.id DESC
-        LIMIT 500
+        LIMIT :limit OFFSET :offset
     """)
-    fun searchTransactions(
+    suspend fun searchTransactions(
         workspaceId: Long,
         query: String,
         type: String,
@@ -584,8 +590,47 @@ interface FinanceDao {
         categoryId: Long?,
         minAmount: Long?,
         maxAmount: Long?,
-        sortOrder: String
-    ): Flow<List<TransactionEntity>>
+        sortOrder: String,
+        limit: Int,
+        offset: Int
+    ): List<TransactionEntity>
+
+    @Query("""
+        SELECT COUNT(*) FROM transactions AS t
+        WHERE t.workspaceId = :workspaceId AND t.isVoided = 0
+          AND (
+              :query = ''
+              OR t.title LIKE '%' || :query || '%'
+              OR t.note LIKE '%' || :query || '%'
+              OR EXISTS (
+                  SELECT 1 FROM categories AS c
+                  WHERE c.id = t.categoryId
+                    AND c.workspaceId = t.workspaceId
+                    AND c.name LIKE '%' || :query || '%'
+              )
+          )
+          AND (
+              :type = 'ALL'
+              OR (:type = 'OTHER' AND t.type NOT IN ('INCOME', 'EXPENSE', 'TRANSFER'))
+              OR t.type = :type
+          )
+          AND t.occurredAt BETWEEN :startAt AND :endAt
+          AND (:accountId IS NULL OR t.fromAccountId = :accountId OR t.toAccountId = :accountId)
+          AND (:categoryId IS NULL OR t.categoryId = :categoryId)
+          AND (:minAmount IS NULL OR t.amountMinor >= :minAmount)
+          AND (:maxAmount IS NULL OR t.amountMinor <= :maxAmount)
+    """)
+    suspend fun countSearchTransactions(
+        workspaceId: Long,
+        query: String,
+        type: String,
+        startAt: Long,
+        endAt: Long,
+        accountId: Long?,
+        categoryId: Long?,
+        minAmount: Long?,
+        maxAmount: Long?
+    ): Int
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertBudget(budget: BudgetEntity): Long

@@ -918,9 +918,10 @@ private fun parseFinanceDate(input: String): Long? {
 private fun financeDate(value: Long): String =
     java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date(value))
 
-private fun financeRupiah(value: Long): String {
-    return NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+@Composable
+private fun financeRupiah(value: Long): String = duitDisplayAmount(
+    NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
         maximumFractionDigits = 0
         minimumFractionDigits = 0
     }.format(value)
-}
+)

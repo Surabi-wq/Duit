@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **1.0.0**
+- Versi: **1.1.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -13,6 +13,16 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Penyimpanan: Room di atas SQLite
 - Database Room: versi 3
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
+
+## Perbaikan fungsional dan UX versi 1.1.0
+
+- Histori transaksi tidak lagi berhenti pada 500 baris: daftar memakai pemuatan bertahap 50 baris per permintaan, total hasil dihitung dari SQLite, dan filter tetap dijalankan di database.
+- Ekspor CSV membaca seluruh hasil yang cocok dengan filter, per batch 500 baris, langsung ke penyimpanan yang dipilih lewat Android Storage Access Framework. Header hanya ditulis sekali, UTF-8 BOM serta mitigasi formula injection dipertahankan.
+- Dashboard kini memiliki pengaturan tujuh widget (arus kas, tren, akun, rencana, peringatan, jatuh tempo, aktivitas) yang disimpan lokal di perangkat.
+- Tombol visibilitas saldo di header dapat menyamarkan atau menampilkan nominal pada dashboard, transaksi, perencanaan, dan aset/kewajiban. Preferensi penyamaran hanya untuk privasi tampilan; bukan pengunci aplikasi atau enkripsi.
+- Ringkasan transaksi dashboard dibatasi ke 20 entri terbaru di query, sehingga tidak menarik 200 entri ketika hanya empat baris yang ditampilkan.
+- Header dipadatkan untuk mengurangi risiko sesak pada layar sempit; bottom navigation mendapatkan semantik tab terpilih untuk pembaca layar.
+- Tidak ada perubahan skema Room (tetap versi 3), data transaksi, atau rumus saldo/kekayaan bersih. Tidak ada penggunaan angka contoh.
 
 ## Perombakan pengalaman aplikasi versi 1.0.0
 
@@ -47,7 +57,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Panduan menjadi pusat bantuan yang dapat dicari dan berisi pintasan menuju modul terkait.
 - Seluruh alur UI baru tetap membaca data Room/SQLite lokal; tidak ada data demo atau layanan eksternal baru.
 
-Catatan cakupan: daftar transaksi masih dibatasi 500 hasil oleh query saat ini. Pagination/muat bertahap untuk histori ribuan transaksi belum selesai. Pengujian navigasi dan tampilan pada perangkat Android fisik serta ukuran font besar masih diperlukan.
+Catatan cakupan versi 1.1.0: histori dapat ditelusuri dengan pemuatan bertahap dan ekspor CSV mencakup semua baris yang cocok. Pengujian UI otomatis/perangkat fisik, pemulihan backup, enkripsi database, penguncian biometrik, pengeditan transaksi, dan rekonsiliasi akun masih merupakan pekerjaan terpisah.
 
 ### Workspace, akun, dan dashboard
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.

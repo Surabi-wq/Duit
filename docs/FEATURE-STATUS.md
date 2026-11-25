@@ -1,6 +1,13 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **1.0.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+
+## Penyempurnaan UI/UX dan privasi — 1.1.0
+- Widget dashboard dapat dinyalakan/dimatikan per bagian: arus kas, tren, rekening, rencana, peringatan, jatuh tempo, dan aktivitas. Preferensi disimpan lokal.
+- Tombol penyamaran nominal di header menyembunyikan nilai uang pada dashboard, transaksi, perencanaan, aset, piutang, dan kewajiban. Mode ini tidak mengubah data dan bukan pengganti penguncian atau enkripsi aplikasi.
+- Navigasi bawah memiliki semantik item terpilih untuk pembaca layar; header dipadatkan agar pemilih workspace dan kontrol tidak mudah bertabrakan pada layar sempit.
+- Daftar transaksi menggunakan pagination 50 baris; ekspor CSV membaca seluruh hasil per batch.
+- Query ringkasan transaksi dashboard hanya mengambil 20 baris terbaru, sementara query jumlah transaksi terpisah digunakan untuk kondisi data kosong.
 
 ## Sudah memiliki alur kerja nyata
 
@@ -13,11 +20,13 @@ Versi source saat ini: **1.0.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ### Transaksi dan kontrol data
 - Pemasukan, pengeluaran, dan transfer antar-akun.
-- Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi; hasil dibatasi 500 transaksi terbaru yang cocok.
+- Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi.
+- Histori dimuat secara bertahap 50 baris per halaman dengan total hasil terhitung di SQLite; tidak memuat semua riwayat ke memori dan tidak memiliki batas 500 baris pada layar.
+- Pencarian dan filter diterapkan pada database sebelum pagination; pemuatan ulang dilakukan saat data transaksi aktif berubah.
 - Filter berdasarkan jenis, rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, dan pengurutan tanggal atau nominal.
 - Validasi rentang tanggal menolak tanggal kalender tidak valid, teks tambahan, dan rentang awal yang melebihi tanggal akhir.
 - Filter divalidasi pada repository dan query dijalankan pada database; pencarian tidak memuat seluruh histori transaksi ke memori.
-- Ekspor CSV dari hasil pencarian dan filter yang sedang ditampilkan melalui Android Storage Access Framework; maksimal 500 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
+- Ekspor CSV mencakup seluruh hasil pencarian/filter dengan pembacaan dan penulisan per batch 500 baris melalui Android Storage Access Framework; UTF-8 BOM dan perlindungan formula spreadsheet tetap aktif.
 - Pembatalan transaksi (void) dengan alasan yang tersimpan pada audit log; catatan transaksi tidak dihapus.
 - Validasi akun/kategori harus berasal dari workspace yang sama.
 - Semua insert yang terkait dilakukan dalam transaksi database Room.

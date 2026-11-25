@@ -1,5 +1,6 @@
 package com.surabi.duit.data
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -53,4 +54,31 @@ class TransactionCsvExporterTest {
         assertTrue(csv.contains("\"'@SUM(1,1)\""))
         assertTrue(csv.contains("\"'+Wallet\""))
     }
+    @Test
+    fun streamsMultipleBatchesWithOnlyOneHeader() {
+        val first = TransactionEntity(
+            id = 1,
+            workspaceId = 1,
+            type = "EXPENSE",
+            title = "Belanja pertama",
+            amountMinor = 10000,
+            fromAccountId = 1,
+            occurredAt = 1,
+            createdAt = 1
+        )
+        val second = first.copy(id = 2, title = "Belanja kedua", amountMinor = 20000)
+
+        val output = StringBuilder()
+        TransactionCsvExporter.writeHeader(output)
+        TransactionCsvExporter.writeRows(output, listOf(first), mapOf(1L to "Dompet"), emptyMap())
+        TransactionCsvExporter.writeRows(output, listOf(second), mapOf(1L to "Dompet"), emptyMap())
+
+        val csv = output.toString()
+        assertTrue(csv.startsWith("\uFEFF"))
+        assertEquals(1, csv.split("\"ID\"").size - 1)
+        assertTrue(csv.contains("\"1\""))
+        assertTrue(csv.contains("\"Belanja pertama\""))
+        assertTrue(csv.contains("\"Belanja kedua\""))
+    }
+
 }
