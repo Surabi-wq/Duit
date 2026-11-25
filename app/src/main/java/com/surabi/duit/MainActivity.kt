@@ -5,6 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.paging.LoadState
+import androidx.paging.PagingData
+import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Clear
@@ -743,7 +746,29 @@ private fun TransactionsScreen(
             "Nominal minimum tidak boleh melebihi nominal maksimum."
         else -> null
     }
-    val visible by remember(
+    val pagingTransactions = remember(
+        workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
+        categoryFilterId, minAmount, maxAmount, sortOrder, filterError
+    ) {
+        if (filterError != null) {
+            flowOf(PagingData.empty<TransactionEntity>())
+        } else {
+            repository.pagedSearchTransactions(
+                workspaceId = workspaceId,
+                query = appliedSearchQuery,
+                type = typeFilter,
+                startAt = dateBounds!!.startAt,
+                endAt = dateBounds!!.endAt,
+                accountId = accountFilterId.takeIf { it != 0L },
+                categoryId = categoryFilterId.takeIf { it != 0L },
+                minAmount = minAmount,
+                maxAmount = maxAmount,
+                sortOrder = sortOrder
+            )
+        }
+    }.collectAsLazyPagingItems()
+    // CSV export keeps its own bounded database query; on-screen history is unbounded and paged.
+    val exportRows by remember(
         workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
         categoryFilterId, minAmount, maxAmount, sortOrder, filterError
     ) {
@@ -764,13 +789,10 @@ private fun TransactionsScreen(
             )
         }
     }.collectAsState(initial = emptyList())
-    val groupedTransactions = remember(visible, sortOrder) {
-        if (sortOrder == "AMOUNT_ASC" || sortOrder == "AMOUNT_DESC") {
-            mapOf(Long.MIN_VALUE to visible)
-        } else {
-            visible.groupBy { transactionDayStart(it.occurredAt) }
-        }
-    }
+    val amountSort = sortOrder == "AMOUNT_ASC" || sortOrder == "AMOUNT_DESC"
+    val refreshError = pagingTransactions.loadState.refresh as? LoadState.Error
+    val appendError = pagingTransactions.loadState.append as? LoadState.Error
+    val isInitialLoading = pagingTransactions.loadState.refresh is LoadState.Loading && pagingTransactions.itemCount == 0
 
     Column(Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).padding(horizontal = 16.dp, vertical = 14.dp)) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -783,10 +805,10 @@ private fun TransactionsScreen(
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
-                onClick = { onExport(visible) },
-                enabled = visible.isNotEmpty() && filterError == null,
+                onClick = { onExport(exportRows) },
+                enabled = exportRows.isNotEmpty() && filterError == null,
                 modifier = Modifier.weight(1f)
-            ) { Text("Ekspor CSV") }
+            ) { Text("Ekspor CSV (maks. 500)") }
             Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
@@ -832,7 +854,7 @@ private fun TransactionsScreen(
             )
             Spacer(Modifier.weight(1f))
             Text(
-                "${visible.size} hasil • maksimal 500",
+                "${pagingTransactions.itemCount} dimuat • halaman otomatis",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -921,7 +943,21 @@ private fun TransactionsScreen(
         Spacer(Modifier.height(8.dp))
         if (filterError != null) {
             DuitEmptyState(title = "Filter belum valid", message = filterError, icon = Icons.Filled.Info)
-        } else if (visible.isEmpty()) {
+        } else if (isInitialLoading) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularProgressIndicator()
+                    Text("Memuat transaksi dari penyimpanan lokal…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        } else if (refreshError != null && pagingTransactions.itemCount == 0) {
+            DuitEmptyState(
+                title = "Transaksi tidak dapat dimuat",
+                message = refreshError.error.message ?: "Terjadi kendala saat membaca histori transaksi.",
+                icon = Icons.Filled.Info,
+                action = { OutlinedButton(onClick = { pagingTransactions.retry() }) { Text("Coba lagi") } }
+            )
+        } else if (pagingTransactions.itemCount == 0) {
             if (!hasTransactions) {
                 DuitEmptyState(
                     title = "Belum ada transaksi",
@@ -938,7 +974,8 @@ private fun TransactionsScreen(
             }
         } else {
             Text(
-                "Dikelompokkan berdasarkan tanggal • hingga 500 hasil terbaru yang cocok",
+                if (amountSort) "Urutan berdasarkan nominal • data dimuat bertahap"
+                else "Dikelompokkan berdasarkan tanggal • muat otomatis saat digulir",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -946,17 +983,33 @@ private fun TransactionsScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                groupedTransactions.forEach { (day, rows) ->
-                    item(key = "transaction-day-$day") {
-                        Text(
-                            if (day == Long.MIN_VALUE) "Urutan berdasarkan nominal" else transactionDayLabel(day),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
-                        )
-                    }
-                    items(rows, key = { it.id }) { item ->
+                items(
+                    count = pagingTransactions.itemCount,
+                    key = { index -> pagingTransactions.peek(index)?.id ?: "transaction-placeholder-$index" }
+                ) { index ->
+                    val item = pagingTransactions[index]
+                    if (item != null) {
+                        val currentDay = transactionDayStart(item.occurredAt)
+                        val previousDay = if (!amountSort && index > 0) {
+                            pagingTransactions.peek(index - 1)?.occurredAt?.let(::transactionDayStart)
+                        } else null
+                        if (amountSort && index == 0) {
+                            Text(
+                                "Urutan berdasarkan nominal",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                        } else if (!amountSort && (index == 0 || previousDay != currentDay)) {
+                            Text(
+                                transactionDayLabel(currentDay),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                            )
+                        }
                         DuitTransactionTile(
                             item = item,
                             accountName = accountNames[item.fromAccountId],
@@ -965,6 +1018,26 @@ private fun TransactionsScreen(
                             onClick = { selectedDetails = item },
                             onVoid = { selectedToVoid = item }
                         )
+                    }
+                }
+                if (pagingTransactions.loadState.append is LoadState.Loading) {
+                    item(key = "transaction-append-loading") {
+                        Row(
+                            Modifier.fillMaxWidth().padding(14.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text("Memuat halaman berikutnya…", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                if (appendError != null) {
+                    item(key = "transaction-append-error") {
+                        OutlinedButton(onClick = { pagingTransactions.retry() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Gagal memuat berikutnya • ketuk untuk mencoba lagi")
+                        }
                     }
                 }
             }
