@@ -115,7 +115,7 @@ import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.TransactionDateRange
-import com.surabi.duit.data.TransactionCsvExporter
+import com.surabi.duit.data.TransactionExportRequest
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
 import com.surabi.duit.ui.LocalDuitBalancesVisible
@@ -181,23 +181,25 @@ private fun DuitApp(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var pendingCsv by remember { mutableStateOf<String?>(null) }
+    var pendingCsvRequest by remember { mutableStateOf<TransactionExportRequest?>(null) }
     val csvExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
-        val csv = pendingCsv
-        pendingCsv = null
-        if (uri != null && csv != null) {
+        val request = pendingCsvRequest
+        pendingCsvRequest = null
+        if (uri != null && request != null) {
             scope.launch {
                 val writeResult = withContext(Dispatchers.IO) {
                     runCatching {
                         val output = context.contentResolver.openOutputStream(uri)
                             ?: error("Lokasi penyimpanan tidak dapat dibuka.")
-                        output.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
+                        output.bufferedWriter(Charsets.UTF_8).use { writer ->
+                            repository.exportTransactionsToCsv(request, writer)
+                        }
                     }
                 }
                 writeResult
-                    .onSuccess { snackbar.showSnackbar("Ekspor CSV berhasil disimpan.") }
+                    .onSuccess { snackbar.showSnackbar("Ekspor seluruh hasil filter berhasil disimpan.") }
                     .onFailure { snackbar.showSnackbar(it.message ?: "Ekspor CSV gagal disimpan.") }
             }
         }
@@ -390,12 +392,8 @@ private fun DuitApp(
                     accounts = accounts,
                     categories = categories,
                     onAdd = { showTransactionDialog = true },
-                    onExport = { rows ->
-                        pendingCsv = TransactionCsvExporter.toCsv(
-                            transactions = rows,
-                            accountNames = accounts.associate { it.id to it.name },
-                            categoryNames = categories.associate { it.id to it.name }
-                        )
+                    onExport = { request ->
+                        pendingCsvRequest = request
                         val fileStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
                         csvExportLauncher.launch("Duit-Transaksi-$fileStamp.csv")
                     },
@@ -729,7 +727,7 @@ private fun TransactionsScreen(
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
     onAdd: () -> Unit,
-    onExport: (List<TransactionEntity>) -> Unit,
+    onExport: (TransactionExportRequest) -> Unit,
     onVoid: (Long, String) -> Unit
 ) {
     val accountNames = accounts.associate { it.id to it.name }
@@ -788,28 +786,6 @@ private fun TransactionsScreen(
             )
         }
     }.collectAsLazyPagingItems()
-    // CSV export keeps its own bounded database query; on-screen history is unbounded and paged.
-    val exportRows by remember(
-        workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
-        categoryFilterId, minAmount, maxAmount, sortOrder, filterError
-    ) {
-        if (filterError != null) {
-            flowOf(emptyList())
-        } else {
-            repository.searchTransactions(
-                workspaceId = workspaceId,
-                query = appliedSearchQuery,
-                type = typeFilter,
-                startAt = dateBounds!!.startAt,
-                endAt = dateBounds!!.endAt,
-                accountId = accountFilterId.takeIf { it != 0L },
-                categoryId = categoryFilterId.takeIf { it != 0L },
-                minAmount = minAmount,
-                maxAmount = maxAmount,
-                sortOrder = sortOrder
-            )
-        }
-    }.collectAsState(initial = emptyList())
     val amountSort = sortOrder == "AMOUNT_ASC" || sortOrder == "AMOUNT_DESC"
     val refreshError = pagingTransactions.loadState.refresh as? LoadState.Error
     val appendError = pagingTransactions.loadState.append as? LoadState.Error
@@ -826,10 +802,27 @@ private fun TransactionsScreen(
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             OutlinedButton(
-                onClick = { onExport(exportRows) },
-                enabled = exportRows.isNotEmpty() && filterError == null,
+                onClick = {
+                    onExport(
+                        TransactionExportRequest(
+                            workspaceId = workspaceId,
+                            query = appliedSearchQuery,
+                            type = typeFilter,
+                            startAt = dateBounds!!.startAt,
+                            endAt = dateBounds!!.endAt,
+                            accountId = accountFilterId.takeIf { it != 0L },
+                            categoryId = categoryFilterId.takeIf { it != 0L },
+                            minAmount = minAmount,
+                            maxAmount = maxAmount,
+                            sortOrder = sortOrder,
+                            accountNames = accountNames,
+                            categoryNames = categoryNames
+                        )
+                    )
+                },
+                enabled = pagingTransactions.itemCount > 0 && filterError == null,
                 modifier = Modifier.weight(1f)
-            ) { Text("Ekspor CSV (maks. 500)") }
+            ) { Text("Ekspor seluruh hasil") }
             Button(onClick = onAdd, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Add, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
