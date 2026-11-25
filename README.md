@@ -36,7 +36,7 @@ Catatan cakupan: daftar transaksi masih dibatasi 500 hasil oleh query saat ini. 
 - Banyak akun per workspace: tunai, bank, tabungan, e-wallet, kartu kredit, investasi, dan lainnya.
 - Batas saldo minimum dapat diatur per akun; perubahan tersimpan pada audit log dan tidak mengubah saldo maupun histori transaksi.
 - Saldo akun dihitung dari saldo awal serta transaksi; bukan angka saldo manual yang dapat tertinggal dari histori.
-- Dashboard workspace menampilkan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, aktivitas transaksi terbaru, dan peringatan berbasis aturan lokal.
+- Dashboard workspace menampilkan saldo akun, pemasukan/pengeluaran berdasarkan periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), arus kas, anggaran, estimasi kekayaan bersih, aktivitas transaksi terbaru, dan peringatan berbasis aturan lokal.
 - Peringatan mencakup saldo negatif, saldo di bawah batas minimum, anggaran hampir habis/terlampaui, arus kas negatif, serta utang/piutang yang melewati jatuh tempo.
 
 ### Transaksi
