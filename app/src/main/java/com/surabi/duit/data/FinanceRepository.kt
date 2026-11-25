@@ -2,6 +2,8 @@ package com.surabi.duit.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 
 class FinanceRepository(private val database: FinanceDatabase) {
     private val dao = database.financeDao()
@@ -42,38 +44,42 @@ class FinanceRepository(private val database: FinanceDatabase) {
         maxAmount: Long? = null,
         sortOrder: String = "NEWEST"
     ): Flow<List<TransactionEntity>> {
-        require(type in setOf("ALL", "INCOME", "EXPENSE", "TRANSFER", "OTHER")) {
-            "Filter jenis transaksi tidak valid."
-        }
-        require(startAt <= endAt) { "Rentang tanggal transaksi tidak valid." }
-        require(accountId == null || dao.getAccount(accountId, workspaceId) != null) {
-            "Akun filter tidak ditemukan pada workspace ini."
-        }
-        if (categoryId != null) {
-            require(dao.getCategoryKind(categoryId, workspaceId) != null) {
-                "Kategori filter tidak ditemukan pada workspace ini."
+        return flow {
+            require(type in setOf("ALL", "INCOME", "EXPENSE", "TRANSFER", "OTHER")) {
+                "Filter jenis transaksi tidak valid."
             }
+            require(startAt <= endAt) { "Rentang tanggal transaksi tidak valid." }
+            require(accountId == null || dao.getAccount(accountId, workspaceId) != null) {
+                "Akun filter tidak ditemukan pada workspace ini."
+            }
+            if (categoryId != null) {
+                require(dao.getCategoryKind(categoryId, workspaceId) != null) {
+                    "Kategori filter tidak ditemukan pada workspace ini."
+                }
+            }
+            require(minAmount == null || minAmount >= 0L) { "Nominal minimum tidak boleh negatif." }
+            require(maxAmount == null || maxAmount >= 0L) { "Nominal maksimum tidak boleh negatif." }
+            require(minAmount == null || maxAmount == null || minAmount <= maxAmount) {
+                "Nominal minimum tidak boleh melebihi nominal maksimum."
+            }
+            require(sortOrder in setOf("NEWEST", "OLDEST", "AMOUNT_ASC", "AMOUNT_DESC")) {
+                "Pengurutan transaksi tidak valid."
+            }
+            emitAll(
+                dao.searchTransactions(
+                    workspaceId = workspaceId,
+                    query = query.trim().take(100),
+                    type = type,
+                    startAt = startAt,
+                    endAt = endAt,
+                    accountId = accountId,
+                    categoryId = categoryId,
+                    minAmount = minAmount,
+                    maxAmount = maxAmount,
+                    sortOrder = sortOrder
+                )
+            )
         }
-        require(minAmount == null || minAmount >= 0L) { "Nominal minimum tidak boleh negatif." }
-        require(maxAmount == null || maxAmount >= 0L) { "Nominal maksimum tidak boleh negatif." }
-        require(minAmount == null || maxAmount == null || minAmount <= maxAmount) {
-            "Nominal minimum tidak boleh melebihi nominal maksimum."
-        }
-        require(sortOrder in setOf("NEWEST", "OLDEST", "AMOUNT_ASC", "AMOUNT_DESC")) {
-            "Pengurutan transaksi tidak valid."
-        }
-        return dao.searchTransactions(
-            workspaceId = workspaceId,
-            query = query.trim().take(100),
-            type = type,
-            startAt = startAt,
-            endAt = endAt,
-            accountId = accountId,
-            categoryId = categoryId,
-            minAmount = minAmount,
-            maxAmount = maxAmount,
-            sortOrder = sortOrder
-        )
     }
 
     suspend fun ensureDefaults() {
