@@ -45,12 +45,11 @@ Versi source saat ini: **0.5.0**. Repositori dikembangkan sebagai aplikasi Andro
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
 - Database versi 3 dengan migrasi eksplisit versi 1→2 dan 2→3; tidak memakai destructive migration.
-- Migrasi database versi 1 ke versi 2 dan versi 2 ke versi 3; tidak memakai destructive migration.
 - Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
 - CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, serta escaping dan perlindungan formula pada CSV.
 
-## Aturan akuntansi penting pada versi 0.4.0
+## Aturan akuntansi penting pada versi 0.5.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
@@ -74,7 +73,7 @@ Versi source saat ini: **0.5.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Chart of Accounts, jurnal double-entry, buku besar, neraca saldo, neraca, laba rugi, dan laporan perubahan ekuitas.
 - ERP: perusahaan/cabang/departemen/cost center/proyek terstruktur; penjualan, pembelian, invoice, pelanggan, pemasok, produk, persediaan, gudang, dan HPP.
 - Investasi dengan harga pasar otomatis, dividen, obligasi, dan portofolio.
-- Pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/CSV/DOCX, dan impor spreadsheet.
+- Pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/DOCX, serta impor CSV/spreadsheet.
 - Grafik lengkap, perbandingan periode/workspace, analisis prediktif, rekomendasi cerdas, OCR, dan asisten bahasa sehari-hari.
 - Pengguna multi-peran, hak akses, approval berjenjang.
 - PIN/biometrik, enkripsi database, pengamanan lampiran, backup/restore terenkripsi beserta checksum.
