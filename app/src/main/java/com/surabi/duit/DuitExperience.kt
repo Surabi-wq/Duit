@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Wallet
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +59,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -78,6 +83,7 @@ import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.WorkspaceEntity
+import com.surabi.duit.ui.LocalDuitBalancesVisible
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -96,7 +102,9 @@ internal fun DuitAppHeader(
     workspaces: List<WorkspaceEntity>,
     selectedId: Long,
     onWorkspaceSelected: (Long) -> Unit,
-    onAddWorkspace: () -> Unit
+    onAddWorkspace: () -> Unit,
+    balancesVisible: Boolean,
+    onToggleBalances: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val current = workspaces.firstOrNull { it.id == selectedId }
@@ -119,6 +127,13 @@ internal fun DuitAppHeader(
                 Text("MANAJEMEN KEUANGAN", style = MaterialTheme.typography.labelSmall,
                     color = DuitMuted, maxLines = 1)
             }
+            IconButton(onClick = onToggleBalances, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = if (balancesVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                    contentDescription = if (balancesVisible) "Sembunyikan nominal" else "Tampilkan nominal",
+                    tint = DuitGreen
+                )
+            }
             Box {
                 FilledTonalButton(
                     onClick = { expanded = true },
@@ -140,10 +155,12 @@ internal fun DuitAppHeader(
                     if (workspaces.isEmpty()) {
                         DropdownMenuItem(text = { Text("Memuat workspace…") }, onClick = { expanded = false })
                     }
+                    DropdownMenuItem(
+                        text = { Text("Tambah workspace") },
+                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                        onClick = { expanded = false; onAddWorkspace() }
+                    )
                 }
-            }
-            IconButton(onClick = onAddWorkspace, modifier = Modifier.size(42.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = "Tambah workspace", tint = DuitGreen)
             }
         }
     }
@@ -170,6 +187,10 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
                     modifier = Modifier.weight(1f)
                         .clip(RoundedCornerShape(15.dp))
                         .clickable { onSelect(index) }
+                        .semantics(mergeDescendants = true) {
+                            role = Role.Tab
+                            selected = selected
+                        }
                         .padding(horizontal = 2.dp, vertical = 3.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -656,17 +677,25 @@ internal fun DuitTransactionTile(
     }
 }
 
-private fun duitMoney(value: Long): String =
+@Composable
+private fun duitMoney(value: Long): String {
+    if (!LocalDuitBalancesVisible.current) return "••••••"
+    return
     NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
         maximumFractionDigits = 0
         minimumFractionDigits = 0
     }.format(value)
+}
 
-private fun duitCompactMoney(value: Long): String = when {
+@Composable
+private fun duitCompactMoney(value: Long): String {
+    if (!LocalDuitBalancesVisible.current) return "••••••"
+    return when {
     value >= 1_000_000_000L -> "Rp ${"%.1f".format(Locale.US, value / 1_000_000_000.0)} M"
     value >= 1_000_000L -> "Rp ${"%.1f".format(Locale.US, value / 1_000_000.0)} jt"
     value >= 1_000L -> "Rp ${"%.0f".format(Locale.US, value / 1_000.0)} rb"
     else -> duitMoney(value)
+    }
 }
 
 private fun duitTransactionTypeLabel(type: String): String = when (type) {
