@@ -1,6 +1,8 @@
 package com.surabi.duit.data
 
 import androidx.room.withTransaction
+import androidx.paging.Pager
+import androidx.paging.PagingData
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -18,6 +20,43 @@ class FinanceRepository(private val database: FinanceDatabase) {
 
     fun transactions(workspaceId: Long): Flow<List<TransactionEntity>> =
         dao.observeTransactions(workspaceId)
+
+    fun pagedSearchTransactions(
+        workspaceId: Long,
+        query: String,
+        type: String,
+        startAt: Long,
+        endAt: Long,
+        accountId: Long? = null,
+        categoryId: Long? = null,
+        minAmount: Long? = null,
+        maxAmount: Long? = null,
+        sortOrder: String = "NEWEST"
+    ): Flow<PagingData<TransactionEntity>> {
+        require(type in setOf("ALL", "INCOME", "EXPENSE", "TRANSFER", "OTHER")) {
+            "Filter jenis transaksi tidak valid."
+        }
+        require(startAt <= endAt) { "Rentang tanggal transaksi tidak valid." }
+        require(minAmount == null || minAmount >= 0L) { "Nominal minimum tidak boleh negatif." }
+        require(maxAmount == null || maxAmount >= 0L) { "Nominal maksimum tidak boleh negatif." }
+        require(minAmount == null || maxAmount == null || minAmount <= maxAmount) {
+            "Nominal minimum tidak boleh melebihi nominal maksimum."
+        }
+        return Pager(config = TransactionPagingPolicy.config()) {
+            dao.pagingSearchTransactions(
+                workspaceId = workspaceId,
+                query = query.trim(),
+                type = type,
+                startAt = startAt,
+                endAt = endAt,
+                accountId = accountId,
+                categoryId = categoryId,
+                minAmount = minAmount,
+                maxAmount = maxAmount,
+                sortOrder = sortOrder
+            )
+        }.flow
+    }
 
     fun income(workspaceId: Long, startAt: Long, endAt: Long): Flow<Long> =
         dao.observeIncome(workspaceId, startAt, endAt)
