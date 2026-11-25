@@ -73,7 +73,7 @@ Catatan cakupan: histori transaksi dan ekspor CSV sekarang memakai pemuatan/penu
 - Pencarian transaksi dijalankan langsung pada SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi.
 - Filter lanjutan mencakup rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, serta pengurutan berdasarkan tanggal atau nominal.
 - Validasi tanggal menolak tanggal kalender yang tidak sah, teks tambahan, dan rentang tanggal terbalik.
-- Hasil pencarian menampilkan maksimal 500 transaksi terbaru yang cocok; filter jenis mencakup transaksi khusus seperti setoran target, pembayaran utang, dan penerimaan piutang.
+- Filter transaksi mencakup jenis khusus seperti setoran target, pembayaran utang, dan penerimaan piutang. Pada versi 1.1.0, tampilan histori dimuat secara bertahap melalui Paging 3.
 - Ekspor CSV menyimpan seluruh hasil pencarian/filter aktif secara streaming ke lokasi pilihan Android. Ekspor CSV bukan pengganti backup database.
 - Pembatalan transaksi menggunakan status void dengan alasan; histori tidak dihapus dan pembatalan dicatat pada audit log.
 
@@ -132,7 +132,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.0.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.1.0.apk**.
 
 ## Signing dan distribusi
 
@@ -144,7 +144,7 @@ Database Room versi 4 memiliki migrasi eksplisit dari versi 1 ke 2, versi 2 ke 3
 
 ## Ekspor CSV dan keamanan spreadsheet
 
-Ekspor hanya mencakup hasil pencarian yang ditampilkan (maksimal 500 transaksi terbaru yang cocok). File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
+Ekspor pada versi 1.1.0 memuat seluruh hasil filter aktif secara streaming dalam batch database; bukan dibatasi 500 transaksi. File menggunakan UTF-8 dengan BOM agar lebih mudah dibaca oleh aplikasi spreadsheet. Field teks yang diawali karakter formula umum diberi awalan apostrof sebagai perlindungan dasar dari formula injection. Tetap tinjau file sebelum membukanya dengan aplikasi spreadsheet yang tidak dikenal.
 
 ## Pengujian dan batas verifikasi
 
