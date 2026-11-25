@@ -502,9 +502,9 @@ private fun DuitApp(repository: FinanceRepository) {
     if (showGoalDialog) {
         SavingsGoalDialog(
             onDismiss = { showGoalDialog = false },
-            onSave = { name, target, priority ->
+            onSave = { name, target, targetDate, priority ->
                 scope.launch {
-                    runCatching { repository.createSavingsGoal(workspaceId, name, target, null, priority) }
+                    runCatching { repository.createSavingsGoal(workspaceId, name, target, targetDate, priority) }
                         .onSuccess {
                             showGoalDialog = false
                             snackbar.showSnackbar("Target tabungan berhasil dibuat.")
