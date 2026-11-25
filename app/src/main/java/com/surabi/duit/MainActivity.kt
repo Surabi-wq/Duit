@@ -79,6 +79,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.surabi.duit.data.AccountBalanceRow
+import com.surabi.duit.data.MinimumBalanceParser
 import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
@@ -174,6 +175,7 @@ private fun DuitApp(repository: FinanceRepository) {
     var selectedLiabilityPayment by remember { mutableStateOf<LiabilityOverviewRow?>(null) }
     var selectedReceivableCollection by remember { mutableStateOf<ReceivableOverviewRow?>(null) }
     var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
+    var selectedAccountForMinimum by remember { mutableStateOf<AccountBalanceRow?>(null) }
 
     LaunchedEffect(Unit) { repository.ensureDefaults() }
     LaunchedEffect(workspaces) {
@@ -303,6 +305,7 @@ private fun DuitApp(repository: FinanceRepository) {
                     receivables = receivables,
                     liabilities = liabilities,
                     onAddAccount = { showAccountDialog = true },
+                    onSetAccountMinimumBalance = { selectedAccountForMinimum = it },
                     onAddAsset = { showAssetDialog = true },
                     onAddReceivable = { showReceivableDialog = true },
                     onCollectReceivable = { selectedReceivableCollection = it },
@@ -481,6 +484,31 @@ private fun DuitApp(repository: FinanceRepository) {
                         selectedReceivableCollection = null
                         snackbar.showSnackbar("Penerimaan piutang berhasil dicatat dan saldo akun diperbarui.")
                     }.onFailure { snackbar.showSnackbar(it.message ?: "Penerimaan piutang gagal.") }
+                }
+            }
+        )
+    }
+
+    selectedAccountForMinimum?.let { account ->
+        AccountMinimumBalanceDialog(
+            account = account,
+            onDismiss = { selectedAccountForMinimum = null },
+            onSave = { minimumBalance ->
+                scope.launch {
+                    runCatching {
+                        repository.setAccountMinimumBalance(account.workspaceId, account.id, minimumBalance)
+                    }.onSuccess {
+                        selectedAccountForMinimum = null
+                        snackbar.showSnackbar(
+                            if (minimumBalance == 0L) {
+                                "Peringatan batas saldo minimum dinonaktifkan."
+                            } else {
+                                "Batas saldo minimum akun berhasil diperbarui."
+                            }
+                        )
+                    }.onFailure {
+                        snackbar.showSnackbar(it.message ?: "Batas saldo minimum gagal diperbarui.")
+                    }
                 }
             }
         )
@@ -1159,7 +1187,7 @@ private fun GuideScreen() {
     ) {
         Text("Panduan Duit", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         GuideCard("1. Pisahkan keuangan", "Buat workspace untuk Pribadi, Keluarga, Bisnis, atau Proyek. Data transaksi dan anggaran tiap workspace tidak dicampur.")
-        GuideCard("2. Tambahkan akun", "Buat dompet tunai, rekening bank, tabungan, atau e-wallet. Saldo awal menjadi titik awal perhitungan saldo.")
+        GuideCard("2. Tambahkan akun", "Buat dompet tunai, rekening bank, tabungan, atau e-wallet. Saldo awal menjadi titik awal perhitungan saldo. Dari kartu akun pada tab Aset, atur batas saldo minimum agar dashboard memberi peringatan saat saldo turun di bawah batas.")
         GuideCard("3. Catat transaksi", "Pilih pemasukan, pengeluaran, atau transfer. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.")
         GuideCard("4. Pantau anggaran", "Buat batas pengeluaran bulanan. Realisasi anggaran dihitung dari transaksi pengeluaran yang tersimpan.")
         GuideCard("5. Saring transaksi", "Di halaman Transaksi, cari keterangan atau catatan, lalu gunakan Filter lanjutan untuk menyaring tanggal, akun, kategori, nominal minimum/maksimum, dan urutan hasil. Tanggal akhir mencakup seluruh hari yang dipilih.")
@@ -1332,6 +1360,56 @@ private fun TransactionDialog(
                         note
                     )
                 }
+            ) { Text("Simpan") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    )
+}
+
+@Composable
+private fun AccountMinimumBalanceDialog(
+    account: AccountBalanceRow,
+    onDismiss: () -> Unit,
+    onSave: (Long) -> Unit
+) {
+    var minimumText by remember(account.id, account.minimumBalanceMinor) {
+        mutableStateOf(account.minimumBalanceMinor.toString())
+    }
+    val parsedMinimum = MinimumBalanceParser.parse(minimumText)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Batas saldo minimum") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Akun: ${account.name}", fontWeight = FontWeight.SemiBold)
+                Text("Saldo saat ini: ${formatRupiah(account.balanceMinor)}")
+                OutlinedTextField(
+                    value = minimumText,
+                    onValueChange = { minimumText = it.filter { char -> char in '0'..'9' } },
+                    label = { Text("Batas minimum (rupiah)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Peringatan muncul ketika saldo berada di bawah nilai ini. Isi 0 untuk menonaktifkan peringatan. Pengaturan ini tidak mengubah saldo atau transaksi.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (minimumText.isNotBlank() && parsedMinimum == null) {
+                    Text(
+                        "Nominal terlalu besar atau tidak valid.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = parsedMinimum != null,
+                onClick = { parsedMinimum?.let(onSave) }
             ) { Text("Simpan") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
