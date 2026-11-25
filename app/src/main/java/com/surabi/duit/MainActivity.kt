@@ -1351,7 +1351,7 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
                 "Transfer mengurangi akun sumber dan menambah akun tujuan. Transfer tidak dianggap pendapatan atau biaya.",
                 AppTab.TRANSACTIONS, "Buka Transaksi"),
             GuideEntry("Transaksi", "Cari dan ekspor transaksi",
-                "Gunakan pencarian dan filter tanggal, akun, kategori, nominal, serta jenis. CSV mengekspor hasil yang sedang tampil, maksimal 500 transaksi; bukan backup database.",
+                "Gunakan pencarian dan filter tanggal, akun, kategori, nominal, serta jenis. CSV mengekspor seluruh hasil filter aktif secara bertahap; bukan backup database.",
                 AppTab.TRANSACTIONS, "Buka Transaksi"),
             GuideEntry("Perencanaan", "Buat anggaran",
                 "Anggaran membandingkan batas dengan transaksi pengeluaran yang cocok. Realisasi dan sisa dihitung dari transaksi tersimpan.",
@@ -1365,8 +1365,14 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
             GuideEntry("Aset", "Kelola utang dan piutang",
                 "Pembayaran utang mengurangi saldo akun dan kewajiban. Piutang menambah saldo akun hanya ketika penerimaan benar-benar dicatat.",
                 AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Keamanan", "Sembunyikan nominal di layar",
+                "Ketuk ikon mata di header untuk menyamarkan nominal pada ringkasan, transaksi, perencanaan, dan aset. Pengaturan tampilan disimpan lokal; ini bukan kunci aplikasi atau enkripsi database.",
+                AppTab.DASHBOARD, "Buka Ringkasan"),
+            GuideEntry("Dashboard", "Atur widget ringkasan",
+                "Gunakan ikon pengaturan pada header dashboard untuk menampilkan atau menyembunyikan tren arus kas, rekening, rencana, peringatan, jatuh tempo, dan aktivitas terbaru.",
+                AppTab.DASHBOARD, "Buka Ringkasan"),
             GuideEntry("Keamanan", "Penyimpanan offline dan cadangan",
-                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV bukan pengganti backup.",
+                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV dapat menulis seluruh transaksi yang cocok, tetapi bukan pengganti backup database.",
                 AppTab.GUIDE, "Tetap di Panduan")
         )
     }
@@ -1451,7 +1457,7 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
         )
         GuideCard(
             "Apakah ekspor CSV mencadangkan seluruh aplikasi?",
-            "Tidak. CSV hanya menyalin hasil transaksi yang sedang tampil, maksimal 500 baris. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
+            "Tidak. CSV menulis seluruh hasil transaksi yang cocok dengan filter aktif secara bertahap. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
         )
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
