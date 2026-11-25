@@ -5,7 +5,7 @@ Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Andro
 ## Sudah memiliki alur kerja nyata
 
 ### Dashboard, workspace, dan akun
-- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
+- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
 - Batas saldo minimum dapat diatur per akun; nilai 0 menonaktifkan peringatan. Perubahan dibatasi pada akun di workspace yang sama dan dicatat pada audit log.
@@ -41,7 +41,7 @@ Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Kekayaan bersih terdata = saldo akun + dana target + nilai aset non-tunai − sisa utang.
 
 ### Peringatan keuangan dashboard
-- Mesin aturan lokal mengevaluasi saldo negatif, saldo di bawah batas minimum akun, realisasi anggaran (peringatan mulai 80% dan kritis saat terlampaui), arus kas bulanan negatif, serta utang/piutang yang sudah melewati jatuh tempo.
+- Mesin aturan lokal mengevaluasi saldo negatif, saldo di bawah batas minimum akun, realisasi anggaran (peringatan mulai 80% dan kritis saat terlampaui), arus kas negatif sesuai periode terpilih, serta utang/piutang yang sudah melewati jatuh tempo.
 - Peringatan dihitung dari data workspace aktif; tidak mengubah transaksi atau saldo.
 - Peringatan dibatasi pada lima item teratas agar dashboard tetap ringkas.
 
