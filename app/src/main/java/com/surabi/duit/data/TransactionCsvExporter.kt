@@ -5,8 +5,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Builds a spreadsheet-safe CSV snapshot for the transaction rows currently
- * shown to the user. Text cells are protected against formula injection.
+ * Writes spreadsheet-safe CSV data. The streaming methods support bounded
+ * database batches; text cells are protected against formula injection.
  */
 object TransactionCsvExporter {
     fun toCsv(
