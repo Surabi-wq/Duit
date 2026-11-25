@@ -519,12 +519,26 @@ interface FinanceDao {
     suspend fun insertAuditLog(log: AuditLogEntity): Long
 
     @Query("""
-        SELECT * FROM transactions
-        WHERE workspaceId = :workspaceId AND isVoided = 0
-          AND (:query = '' OR title LIKE '%' || :query || '%' OR note LIKE '%' || :query || '%')
-          AND (:type = 'ALL' OR type = :type)
-          AND occurredAt BETWEEN :startAt AND :endAt
-        ORDER BY occurredAt DESC, id DESC
+        SELECT t.* FROM transactions AS t
+        WHERE t.workspaceId = :workspaceId AND t.isVoided = 0
+          AND (
+              :query = ''
+              OR t.title LIKE '%' || :query || '%'
+              OR t.note LIKE '%' || :query || '%'
+              OR EXISTS (
+                  SELECT 1 FROM categories AS c
+                  WHERE c.id = t.categoryId
+                    AND c.workspaceId = t.workspaceId
+                    AND c.name LIKE '%' || :query || '%'
+              )
+          )
+          AND (
+              :type = 'ALL'
+              OR (:type = 'OTHER' AND t.type NOT IN ('INCOME', 'EXPENSE', 'TRANSFER'))
+              OR t.type = :type
+          )
+          AND t.occurredAt BETWEEN :startAt AND :endAt
+        ORDER BY t.occurredAt DESC, t.id DESC
         LIMIT 500
     """)
     fun searchTransactions(
