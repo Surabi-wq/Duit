@@ -26,6 +26,12 @@ class FinanceRepository(private val database: FinanceDatabase) {
     fun budgets(workspaceId: Long): Flow<List<BudgetOverviewRow>> =
         dao.observeBudgetOverview(workspaceId)
 
+    fun goals(workspaceId: Long): Flow<List<GoalOverviewRow>> = dao.observeGoals(workspaceId)
+    fun assets(workspaceId: Long): Flow<List<AssetEntity>> = dao.observeAssets(workspaceId)
+    fun liabilities(workspaceId: Long): Flow<List<LiabilityOverviewRow>> = dao.observeLiabilities(workspaceId)
+    fun searchTransactions(workspaceId: Long, query: String, type: String, startAt: Long, endAt: Long): Flow<List<TransactionEntity>> =
+        dao.searchTransactions(workspaceId, query.trim(), type, startAt, endAt)
+
     suspend fun ensureDefaults() {
         database.withTransaction {
             if (dao.workspaceCount() == 0) {
@@ -134,20 +140,15 @@ class FinanceRepository(private val database: FinanceDatabase) {
 
         val now = System.currentTimeMillis()
         return database.withTransaction {
-            dao.insertTransaction(
+            val id = dao.insertTransaction(
                 TransactionEntity(
-                    workspaceId = workspaceId,
-                    type = type,
-                    title = cleanTitle,
-                    amountMinor = amount,
-                    fromAccountId = source.id,
-                    toAccountId = toAccountId,
-                    categoryId = categoryId,
-                    note = note.trim().take(500),
-                    occurredAt = now,
-                    createdAt = now
+                    workspaceId = workspaceId, type = type, title = cleanTitle, amountMinor = amount,
+                    fromAccountId = source.id, toAccountId = toAccountId, categoryId = categoryId,
+                    note = note.trim().take(500), occurredAt = now, createdAt = now
                 )
             )
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "TRANSACTION", id, "CREATE", "Transaksi $type: $cleanTitle", now))
+            id
         }
     }
 
@@ -189,6 +190,139 @@ class FinanceRepository(private val database: FinanceDatabase) {
                 createdAt = System.currentTimeMillis()
             )
         )
+    }
+
+    suspend fun createSavingsGoal(workspaceId: Long, name: String, targetAmount: Long, targetDate: Long?, priority: Int): Long {
+        val cleanName = name.trim()
+        require(cleanName.isNotEmpty()) { "Nama target wajib diisi." }
+        require(cleanName.length <= 80) { "Nama target maksimal 80 karakter." }
+        require(targetAmount > 0L) { "Target harus lebih besar dari nol." }
+        require(priority in 1..5) { "Prioritas target harus 1 sampai 5." }
+        require(dao.getWorkspace(workspaceId) != null) { "Workspace tidak ditemukan." }
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val id = dao.insertGoal(SavingsGoalEntity(workspaceId = workspaceId, name = cleanName,
+                targetMinor = targetAmount, targetDate = targetDate, priority = priority, createdAt = now))
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "GOAL", id, "CREATE", "Membuat target tabungan $cleanName", now))
+            id
+        }
+    }
+
+    suspend fun moveGoalFunds(workspaceId: Long, goalId: Long, accountId: Long, amount: Long,
+                              isWithdrawal: Boolean, note: String): Long {
+        require(amount > 0L) { "Nominal harus lebih besar dari nol." }
+        val goal = dao.getGoal(goalId, workspaceId) ?: throw IllegalArgumentException("Target tabungan tidak ditemukan.")
+        val account = dao.getAccount(accountId, workspaceId) ?: throw IllegalArgumentException("Akun tidak ditemukan pada workspace ini.")
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            if (isWithdrawal) require(amount <= dao.goalSavedAmount(goal.id, workspaceId)) {
+                "Penarikan melebihi dana yang sudah dialokasikan pada target."
+            }
+            val type = if (isWithdrawal) "GOAL_WITHDRAWAL" else "GOAL_CONTRIBUTION"
+            val id = dao.insertTransaction(TransactionEntity(workspaceId = workspaceId, type = type,
+                title = if (isWithdrawal) "Penarikan target: ${goal.name}" else "Setoran target: ${goal.name}",
+                amountMinor = amount, fromAccountId = account.id, goalId = goal.id,
+                note = note.trim().take(500), occurredAt = now, createdAt = now))
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "GOAL_MOVEMENT", id, "CREATE", "$type ${goal.name}", now))
+            id
+        }
+    }
+
+    suspend fun createAsset(workspaceId: Long, name: String, category: String,
+                            acquisitionCost: Long, currentValue: Long, notes: String): Long {
+        val cleanName = name.trim()
+        require(cleanName.isNotEmpty()) { "Nama aset wajib diisi." }
+        require(cleanName.length <= 80) { "Nama aset maksimal 80 karakter." }
+        require(acquisitionCost >= 0L && currentValue >= 0L) { "Nilai aset tidak boleh negatif." }
+        require(category in setOf("VEHICLE", "PROPERTY", "LAND", "GOLD", "ELECTRONIC", "EQUIPMENT", "OTHER")) {
+            "Kategori aset tidak valid."
+        }
+        require(dao.getWorkspace(workspaceId) != null) { "Workspace tidak ditemukan." }
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val id = dao.insertAsset(AssetEntity(workspaceId = workspaceId, name = cleanName, category = category,
+                acquisitionCostMinor = acquisitionCost, currentValueMinor = currentValue, acquiredAt = now,
+                notes = notes.trim().take(500), updatedAt = now))
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "ASSET", id, "CREATE", "Mencatat aset $cleanName", now))
+            id
+        }
+    }
+
+    suspend fun updateAssetValue(workspaceId: Long, assetId: Long, currentValue: Long) {
+        require(currentValue >= 0L) { "Nilai aset tidak boleh negatif." }
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            require(dao.updateAssetValue(assetId, workspaceId, currentValue, now) == 1) {
+                "Aset tidak ditemukan pada workspace ini."
+            }
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "ASSET", assetId, "VALUE_UPDATE",
+                "Memperbarui nilai aset menjadi $currentValue", now))
+        }
+    }
+
+    suspend fun createLiability(workspaceId: Long, name: String, counterparty: String,
+        originalAmount: Long, dueAt: Long?, receivingAccountId: Long?, notes: String): Long {
+        val cleanName = name.trim()
+        val cleanCounterparty = counterparty.trim()
+        require(cleanName.isNotEmpty()) { "Nama utang wajib diisi." }
+        require(cleanName.length <= 80) { "Nama utang maksimal 80 karakter." }
+        require(cleanCounterparty.isNotEmpty()) { "Nama pemberi pinjaman wajib diisi." }
+        require(originalAmount > 0L) { "Nilai utang harus lebih besar dari nol." }
+        require(dao.getWorkspace(workspaceId) != null) { "Workspace tidak ditemukan." }
+        val receivingAccount = receivingAccountId?.let {
+            dao.getAccount(it, workspaceId) ?: throw IllegalArgumentException("Akun penerima tidak ditemukan pada workspace ini.")
+        }
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val id = dao.insertLiability(LiabilityEntity(workspaceId = workspaceId, name = cleanName,
+                counterparty = cleanCounterparty, originalAmountMinor = originalAmount, dueAt = dueAt,
+                notes = notes.trim().take(500), createdAt = now))
+            if (receivingAccount != null) {
+                dao.insertTransaction(TransactionEntity(workspaceId = workspaceId, type = "LIABILITY_RECEIVED",
+                    title = "Pencairan utang: $cleanName", amountMinor = originalAmount,
+                    fromAccountId = receivingAccount.id, liabilityId = id,
+                    note = "Pencairan pinjaman dari $cleanCounterparty", occurredAt = now, createdAt = now))
+            }
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "LIABILITY", id, "CREATE", "Mencatat utang $cleanName", now))
+            id
+        }
+    }
+
+    suspend fun payLiability(workspaceId: Long, liabilityId: Long, accountId: Long,
+                             amount: Long, note: String): Long {
+        require(amount > 0L) { "Nominal pembayaran harus lebih besar dari nol." }
+        val liability = dao.getLiability(liabilityId, workspaceId)
+            ?: throw IllegalArgumentException("Utang tidak ditemukan.")
+        val account = dao.getAccount(accountId, workspaceId)
+            ?: throw IllegalArgumentException("Akun pembayaran tidak ditemukan pada workspace ini.")
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val outstanding = dao.liabilityOutstanding(liability.id, workspaceId) ?: 0L
+            require(outstanding > 0L) { "Utang ini sudah lunas." }
+            require(amount <= outstanding) { "Pembayaran melebihi sisa utang." }
+            val id = dao.insertTransaction(TransactionEntity(workspaceId = workspaceId, type = "LIABILITY_PAYMENT",
+                title = "Pembayaran utang: ${liability.name}", amountMinor = amount,
+                fromAccountId = account.id, liabilityId = liability.id, note = note.trim().take(500),
+                occurredAt = now, createdAt = now))
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "LIABILITY_PAYMENT", id, "CREATE",
+                "Membayar utang ${liability.name}", now))
+            id
+        }
+    }
+
+    suspend fun voidTransaction(workspaceId: Long, transactionId: Long, reason: String) {
+        val cleanReason = reason.trim()
+        require(cleanReason.isNotEmpty()) { "Alasan pembatalan wajib diisi." }
+        require(cleanReason.length <= 300) { "Alasan maksimal 300 karakter." }
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            val existing = dao.getTransaction(transactionId, workspaceId)
+                ?: throw IllegalArgumentException("Transaksi tidak ditemukan.")
+            require(!existing.isVoided) { "Transaksi sudah dibatalkan." }
+            require(dao.markTransactionVoided(transactionId, workspaceId) == 1) { "Transaksi gagal dibatalkan." }
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "TRANSACTION", transactionId, "VOID",
+                "Membatalkan ${existing.title}: $cleanReason", now))
+        }
     }
 
     private fun defaultCategories(workspaceId: Long): List<CategoryEntity> {
