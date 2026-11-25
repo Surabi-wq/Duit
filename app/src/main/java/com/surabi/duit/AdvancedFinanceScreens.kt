@@ -663,12 +663,14 @@ private fun FinanceChoicePicker(label: String, selected: String, options: List<P
 }
 
 private fun parseFinanceDate(input: String): Long? {
-    if (input.isBlank()) return null
-    return runCatching {
-        java.text.SimpleDateFormat("dd-MM-yyyy", Locale("id", "ID")).apply {
-            isLenient = false
-        }.parse(input.trim())?.time
-    }.getOrNull()
+    val value = input.trim()
+    if (!Regex("""\\d{2}-\\d{2}-\\d{4}""").matches(value)) return null
+    val formatter = java.text.SimpleDateFormat("dd-MM-yyyy", Locale("id", "ID")).apply {
+        isLenient = false
+    }
+    val position = java.text.ParsePosition(0)
+    val parsed = formatter.parse(value, position) ?: return null
+    return parsed.time.takeIf { position.index == value.length && position.errorIndex < 0 }
 }
 
 private fun financeDate(value: Long): String =
