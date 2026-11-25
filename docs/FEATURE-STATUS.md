@@ -1,49 +1,74 @@
 # Status Implementasi Fitur Duit
 
-Dokumen ini membedakan fitur yang sudah memiliki alur kerja aktual dari fitur yang masih berupa target pengembangan.
+Versi source saat ini: **0.2.0**. Repositori dimulai dari kondisi kosong dan dikembangkan sebagai aplikasi Android lokal/offline.
 
-## Fondasi 0.1.0 — tersedia di source code
-- Workspace terpisah dengan jenis Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
-- Akun/dompet ganda per workspace, termasuk saldo awal.
+## Sudah memiliki alur kerja nyata
+
+### Dashboard, workspace, dan akun
+- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, dan estimasi kekayaan bersih.
+- Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
+- Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
+- Akun dapat berupa tunai, bank, tabungan, e-wallet, kartu kredit, investasi, atau lainnya.
+
+### Transaksi dan kontrol data
 - Pemasukan, pengeluaran, dan transfer antar-akun.
-- Kategori transaksi dasar yang disiapkan lokal.
-- Dashboard saldo akun, pemasukan, pengeluaran, dan arus kas bulan berjalan.
-- Anggaran bulanan umum atau berbasis kategori pengeluaran.
-- Daftar maksimal 200 transaksi terbaru per workspace.
-- Penyimpanan lokal Room/SQLite dengan relasi foreign key dan index.
-- Validasi nominal positif, tipe transaksi, akun sumber/tujuan, dan konsistensi workspace.
-- Tes unit parsing nominal integer rupiah.
-- Pipeline CI untuk unit test dan APK Release.
+- Pencarian keterangan/catatan/kategori dan filter jenis pada 200 transaksi terbaru workspace.
+- Pembatalan transaksi (void) dengan alasan yang tersimpan pada audit log; catatan transaksi tidak dihapus.
+- Validasi akun/kategori harus berasal dari workspace yang sama.
+- Semua insert yang terkait dilakukan dalam transaksi database Room.
 
-## Aturan perhitungan yang sudah ditetapkan
-1. Pemasukan menambah saldo akun sumber.
-2. Pengeluaran mengurangi saldo akun sumber.
-3. Transfer mengurangi akun sumber dan menambah akun tujuan.
-4. Transfer tidak masuk ke agregat pemasukan maupun pengeluaran.
-5. Total saldo dashboard merupakan penjumlahan saldo seluruh akun aktif pada workspace terpilih.
-6. Anggaran menghitung transaksi berjenis EXPENSE pada rentang tanggal anggaran. Anggaran kategori hanya menghitung kategori yang dipilih.
-7. Nilai IDR disimpan sebagai Long (rupiah bulat). Perhitungan tidak menggunakan Float atau Double.
+### Anggaran dan tujuan
+- Anggaran bulanan umum atau kategori pengeluaran.
+- Target tabungan dengan nilai tujuan dan prioritas.
+- Setoran target mengurangi saldo akun yang dipilih; penarikan target menambahnya kembali.
+- Nilai target tersimpan berdasarkan transaksi setoran/penarikan, tidak disimpan sebagai angka yang dapat menyimpang dari histori.
 
-## Belum tersedia dan tidak boleh dianggap aktif
-- Edit/hapus transaksi dengan reversal dan audit log.
-- Penyesuaian saldo dan rekonsiliasi rekening.
-- Lampiran foto/dokumen transaksi.
-- Transaksi berulang, terjadwal, massal, impor, dan ekspor.
-- Target tabungan.
-- Aset, penyusutan, kewajiban, utang, dan piutang.
-- Chart of Accounts, jurnal double-entry, buku besar, neraca saldo, neraca, laba rugi, dan arus kas akuntansi.
-- Penjualan, pembelian, invoice, pelanggan, pemasok, inventori, dan gudang.
-- Investasi, pajak, dokumen administrasi, dan multi-mata uang.
-- Analisis prediktif, OCR lokal, serta asisten data.
-- Pengguna/role/permission dan approval workflow.
-- PIN, biometrik, enkripsi database, audit trail lengkap.
-- Backup/restore terenkripsi, checksum, dan migrasi antarversi.
+### Aset dan kewajiban
+- Pencatatan aset non-tunai, kategori aset, harga perolehan, dan nilai terkini.
+- Pembaruan nilai aset dengan catatan perubahan pada audit log.
+- Pencatatan utang dengan pemberi pinjaman, nominal awal, tanggal jatuh tempo opsional, dan catatan.
+- Pencairan pinjaman dapat dikreditkan ke satu akun saat utang dibuat; gunakan hanya bila saldo pencairan belum pernah dicatat.
+- Pembayaran utang mengurangi saldo akun dan sisa utang secara atomik.
+- Kekayaan bersih terdata = saldo akun + dana target + nilai aset non-tunai − sisa utang.
 
-## Gerbang penerimaan sebelum fitur boleh ditandai selesai
-- Alur UI bisa dijalankan sampai data tersimpan.
-- Validasi input dan relasi database diterapkan.
-- Perhitungan diverifikasi dengan kasus normal, batas, dan kasus gagal.
-- Tidak menghilangkan atau mengubah histori secara diam-diam.
-- Unit test dan integration test sesuai risiko modul lulus.
-- Build Debug dan Release berhasil.
-- Tidak ada menu/tombol palsu yang hanya menjadi pajangan.
+### Database dan kualitas
+- Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
+- Migrasi database versi 1 ke versi 2; tidak memakai destructive migration.
+- Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, dan pembatalan transaksi.
+- Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
+- CI menjalankan unit test dan build APK Release.
+
+## Aturan akuntansi penting pada versi 0.2.0
+1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
+2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
+3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
+4. Pembayaran pokok utang mengurangi akun dan kewajiban; bukan seluruhnya biaya.
+5. Pencairan pinjaman menambah akun dan kewajiban; bukan pendapatan.
+6. Nilai aset non-tunai tidak boleh mencakup rekening/dompet yang sudah dicatat pada akun. Hal ini mencegah penghitungan ganda.
+7. Untuk pinjaman yang saldonya sudah tercatat, jangan memilih akun penerima saat membuat data utang.
+
+## Belum tersedia — jangan dianggap aktif
+- Transfer transaksi lintas workspace dengan prosedur kontrol dan konsolidasi multi-workspace.
+- Edit transaksi umum, riwayat versi detail, dan reversal jurnal double-entry.
+- Rekonsiliasi rekening dan penyesuaian saldo formal.
+- Lampiran struk/dokumen, transaksi berulang/terjadwal/massal, template, impor dan ekspor.
+- Target dengan jadwal kontribusi otomatis dan notifikasi pengingat.
+- Penyusutan, jadwal pemeliharaan, penjualan/penghapusan aset melalui jurnal.
+- Piutang, penerimaan piutang, bunga/denda terstruktur, jadwal cicilan otomatis.
+- Chart of Accounts, jurnal double-entry, buku besar, neraca saldo, neraca, laba rugi, dan laporan perubahan ekuitas.
+- ERP: perusahaan/cabang/departemen/cost center/proyek terstruktur; penjualan, pembelian, invoice, pelanggan, pemasok, produk, persediaan, gudang, dan HPP.
+- Investasi dengan harga pasar otomatis, dividen, obligasi, dan portofolio.
+- Pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/CSV/DOCX, dan impor spreadsheet.
+- Grafik lengkap, perbandingan periode/workspace, analisis prediktif, rekomendasi cerdas, OCR, dan asisten bahasa sehari-hari.
+- Pengguna multi-peran, hak akses, approval berjenjang.
+- PIN/biometrik, enkripsi database, pengamanan lampiran, backup/restore terenkripsi beserta checksum.
+- Pengaturan lengkap, tema gelap, mode pemula/mahir, multi-mata uang.
+
+## Gerbang penerimaan
+- Alur UI berakhir dengan data tersimpan, bukan sekadar halaman tampilan.
+- Validasi input dan workspace diterapkan.
+- Perhitungan diperiksa dengan kasus normal, batas, dan kegagalan.
+- Tidak menghapus histori keuangan secara diam-diam.
+- Tes unit/database/UI sesuai risiko modul lulus.
+- Build Debug/Release lulus.
+- Instalasi, upgrade database, dan penggunaan offline perlu diuji pada perangkat Android fisik sebelum dinyatakan siap rilis publik.
