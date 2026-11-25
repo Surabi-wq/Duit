@@ -79,6 +79,8 @@ import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
 import com.surabi.duit.data.FinanceDatabase
 import com.surabi.duit.data.FinanceRepository
+import com.surabi.duit.data.GoalOverviewRow
+import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
