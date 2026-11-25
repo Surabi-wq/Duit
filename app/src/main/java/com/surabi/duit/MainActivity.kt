@@ -228,6 +228,8 @@ private fun DuitApp(repository: FinanceRepository) {
                     income = income,
                     expenses = expenses,
                     netWorth = netWorth,
+                    liabilities = liabilities,
+                    receivables = receivables,
                     onAddTransaction = { showTransactionDialog = true }
                 )
                 AppTab.TRANSACTIONS -> TransactionsScreen(
@@ -515,9 +517,14 @@ private fun DashboardScreen(
     income: Long,
     expenses: Long,
     netWorth: Long,
+    liabilities: List<LiabilityOverviewRow>,
+    receivables: List<ReceivableOverviewRow>,
     onAddTransaction: () -> Unit
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
+    val alerts = remember(accounts, budgets, liabilities, receivables, income, expenses) {
+        FinanceAlertEngine.evaluate(accounts, budgets, liabilities, receivables, income, expenses, System.currentTimeMillis())
+    }
     val netCashflow = income - expenses
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -584,6 +591,26 @@ private fun DashboardScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+        if (alerts.isNotEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("Peringatan keuangan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    alerts.take(5).forEach { alert ->
+                        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Icon(
+                                imageVector = if (alert.severity == FinanceAlertSeverity.CRITICAL) Icons.Filled.Info else Icons.Filled.ExpandMore,
+                                contentDescription = null,
+                                tint = if (alert.severity == FinanceAlertSeverity.CRITICAL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary
+                            )
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(alert.title, fontWeight = FontWeight.SemiBold)
+                                Text(alert.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
