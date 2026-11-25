@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **0.7.0**
+- Versi: **0.8.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -16,12 +16,27 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Fitur yang sudah memiliki alur kerja nyata
 
+## Pembaruan UI/UX versi 0.8.0
+
+- Design system menyatukan palet hijau/biru, warna status, background, surface, dan radius komponen.
+- Header menampilkan identitas Duit dan workspace aktif; navigasi bawah diberi indikator aktif yang konsisten.
+- Tombol tindakan cepat global membuka alur yang benar-benar tersedia: transaksi, akun, anggaran, target, aset, piutang, dan utang.
+- Dashboard memiliki pilihan periode bulan ini, 30 hari terakhir, dan tahun ini. Query pemasukan/pengeluaran mengikuti rentang tanggal lokal dan inklusif.
+- Ringkasan dashboard menampilkan saldo akun, estimasi kekayaan bersih, arus kas, rincian akun, peringatan, anggaran, target, tanggal jatuh tempo yang tercatat, dan transaksi terbaru.
+- Transaksi dikelompokkan per tanggal dan dapat dibuka untuk melihat detail. Pembatalan tetap memakai status void dan alasan audit; edit/hapus permanen tidak ditambahkan.
+- Perencanaan menampilkan ringkasan target dan anggaran; kartu target menampilkan progres, kekurangan, dan tanggal target; kartu anggaran menampilkan periode dan persentase pemakaian.
+- Modul Aset dipisahkan menjadi akun, aset non-tunai, piutang, dan utang. Nilai aset kini dapat diperbarui dari kartu aset.
+- Panduan menjadi pusat bantuan yang dapat dicari dan berisi pintasan menuju modul terkait.
+- Seluruh alur UI baru tetap membaca data Room/SQLite lokal; tidak ada data demo atau layanan eksternal baru.
+
+Catatan cakupan: daftar transaksi masih dibatasi 500 hasil oleh query saat ini. Pagination/muat bertahap untuk histori ribuan transaksi belum selesai. Pengujian navigasi dan tampilan pada perangkat Android fisik serta ukuran font besar masih diperlukan.
+
 ### Workspace, akun, dan dashboard
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun per workspace: tunai, bank, tabungan, e-wallet, kartu kredit, investasi, dan lainnya.
 - Batas saldo minimum dapat diatur per akun; perubahan tersimpan pada audit log dan tidak mengubah saldo maupun histori transaksi.
 - Saldo akun dihitung dari saldo awal serta transaksi; bukan angka saldo manual yang dapat tertinggal dari histori.
-- Dashboard workspace menampilkan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, aktivitas transaksi terbaru, dan peringatan berbasis aturan lokal.
+- Dashboard workspace menampilkan saldo akun, pemasukan/pengeluaran berdasarkan periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), arus kas, anggaran, estimasi kekayaan bersih, aktivitas transaksi terbaru, dan peringatan berbasis aturan lokal.
 - Peringatan mencakup saldo negatif, saldo di bawah batas minimum, anggaran hampir habis/terlampaui, arus kas negatif, serta utang/piutang yang melewati jatuh tempo.
 
 ### Transaksi
@@ -37,7 +52,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ### Anggaran dan target tabungan
 - Anggaran bulanan umum atau berdasarkan kategori pengeluaran.
-- Target tabungan dengan nominal tujuan dan prioritas.
+- Target tabungan dengan nominal tujuan, prioritas, dan tanggal target opsional yang dapat ditentukan saat pembuatan.
 - Setoran target mengurangi saldo akun yang dipilih; penarikan mengembalikan saldo akun.
 - Dana target dihitung dari transaksi setoran/penarikan yang terkait, bukan saldo manual yang dapat tidak sinkron.
 
@@ -90,7 +105,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.7.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-0.8.0.apk**.
 
 ## Signing dan distribusi
 
@@ -98,7 +113,7 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.7.0.
+Database Room versi 3 memiliki migrasi eksplisit dari versi 1 ke 2 dan versi 2 ke 3. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada 0.8.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 

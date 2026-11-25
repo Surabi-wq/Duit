@@ -1,11 +1,11 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **0.7.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
+Versi source saat ini: **0.8.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 3.
 
 ## Sudah memiliki alur kerja nyata
 
 ### Dashboard, workspace, dan akun
-- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran bulan berjalan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
+- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
 - Batas saldo minimum dapat diatur per akun; nilai 0 menonaktifkan peringatan. Perubahan dibatasi pada akun di workspace yang sama dan dicatat pada audit log.
@@ -24,7 +24,7 @@ Versi source saat ini: **0.7.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ### Anggaran dan tujuan
 - Anggaran bulanan umum atau kategori pengeluaran.
-- Target tabungan dengan nilai tujuan dan prioritas.
+- Target tabungan dengan nilai tujuan, prioritas, dan tanggal target opsional yang disimpan ke database.
 - Setoran target mengurangi saldo akun yang dipilih; penarikan target menambahnya kembali.
 - Nilai target tersimpan berdasarkan transaksi setoran/penarikan, tidak disimpan sebagai angka yang dapat menyimpang dari histori.
 
@@ -41,7 +41,7 @@ Versi source saat ini: **0.7.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Kekayaan bersih terdata = saldo akun + dana target + nilai aset non-tunai − sisa utang.
 
 ### Peringatan keuangan dashboard
-- Mesin aturan lokal mengevaluasi saldo negatif, saldo di bawah batas minimum akun, realisasi anggaran (peringatan mulai 80% dan kritis saat terlampaui), arus kas bulanan negatif, serta utang/piutang yang sudah melewati jatuh tempo.
+- Mesin aturan lokal mengevaluasi saldo negatif, saldo di bawah batas minimum akun, realisasi anggaran (peringatan mulai 80% dan kritis saat terlampaui), arus kas negatif sesuai periode terpilih, serta utang/piutang yang sudah melewati jatuh tempo.
 - Peringatan dihitung dari data workspace aktif; tidak mengubah transaksi atau saldo.
 - Peringatan dibatasi pada lima item teratas agar dashboard tetap ringkas.
 
@@ -50,9 +50,39 @@ Versi source saat ini: **0.7.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Database versi 3 dengan migrasi eksplisit versi 1→2 dan 2→3; tidak memakai destructive migration.
 - Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, perubahan batas saldo minimum akun, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
-- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, validasi nominal batas saldo minimum, serta escaping dan perlindungan formula pada CSV.
+- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, batas periode dashboard, validasi nominal batas saldo minimum, serta escaping dan perlindungan formula pada CSV.
 
-## Aturan akuntansi penting pada versi 0.7.0
+
+## Peningkatan UI/UX yang sudah terhubung ke data — 0.8.0
+
+- Design system global dengan palet semantik, surface konsisten, dan shape 8/12/16/20/24 dp.
+- Header workspace, bottom navigation, dan tindakan cepat global.
+- Dashboard memakai query tanggal aktual dengan periode bulan ini, 30 hari terakhir, dan tahun berjalan.
+- Dashboard menampilkan rekening, kekayaan bersih terdata, arus kas, anggaran, target, peringatan, dan jatuh tempo dari database.
+- Daftar transaksi dikelompokkan per tanggal; baris dapat membuka detail transaksi dan catatan.
+- Perencanaan memiliki ringkasan total target/realisasi dan detail tanggal target/periode anggaran.
+- Modul aset dipisah dengan chip kategori; nilai aset dapat diperbarui, serta batas saldo minimum akun tetap dapat diatur.
+- Panduan pencarian topik dan pintasan navigasi ke halaman fitur.
+- Unit test tambahan memeriksa batas periode dashboard lokal dan akhir hari inklusif.
+- Tidak ada perubahan skema database atau rumus saldo/kekayaan bersih pada pembaruan UI ini.
+
+## Temuan audit UI/UX dan status penanganan
+
+**Keparahan tinggi**
+- Riwayat transaksi hanya memuat maksimal 500 hasil. Pengelompokan tanggal dan detail telah ditambahkan, tetapi pagination/muat bertahap untuk ribuan transaksi masih belum ditangani.
+- Aplikasi belum memiliki backup/restore database penuh tervalidasi; ekspor CSV tetap bukan cadangan penuh.
+
+**Keparahan sedang**
+- UI sebelumnya memiliki satu layar orkestrasi besar, tema yang hanya mendefinisikan warna, transaksi tanpa detail, panduan statis, dan dashboard tanpa pilihan periode. Design tokens, reusable components, detail transaksi, pencarian panduan, serta filter periode kini ditambahkan.
+- Tampilan aset, anggaran, target, dan navigasi sebelumnya kurang terstruktur. Halaman kini dipisah berdasarkan kategori dan menampilkan ringkasan/progres.
+
+**Keparahan yang masih terbuka**
+- Modul transaksi umum belum memiliki edit, hapus dengan koreksi, duplikasi/template, lampiran, dan impor.
+- Belum ada pengaturan widget dashboard, penyembunyian saldo global, PIN/biometrik, enkripsi database, maupun backup/restore.
+- Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
+- Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menjadi koordinator layar dan dialog yang besar.
+
+## Aturan akuntansi penting pada versi 0.8.0
 1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
 2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
 3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.

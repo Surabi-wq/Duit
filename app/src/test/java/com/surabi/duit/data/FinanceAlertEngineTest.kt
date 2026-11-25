@@ -42,6 +42,23 @@ class FinanceAlertEngineTest {
     }
 
     @Test
+    fun negativeCashflowAlertUsesSelectedDashboardPeriod() {
+        val alerts = FinanceAlertEngine.evaluate(
+            emptyList(),
+            emptyList(),
+            emptyList(),
+            emptyList(),
+            income = 10,
+            expenses = 20,
+            now = 10_000,
+            periodLabel = "30 hari terakhir"
+        )
+
+        assertEquals("Arus kas 30 hari terakhir negatif", alerts.single().title)
+        assertTrue(alerts.single().message.contains("selama 30 hari terakhir"))
+    }
+
+    @Test
     fun ignoresSettledAndNotYetDueObligationsIncludingToday() {
         val debt = LiabilityOverviewRow(1, 1, "Lunas", "Bank", 100_000, 0, 1_000, true)
         val today = java.util.Calendar.getInstance().apply {

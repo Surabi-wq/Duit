@@ -35,7 +35,8 @@ object FinanceAlertEngine {
         receivables: List<ReceivableOverviewRow>,
         income: Long,
         expenses: Long,
-        now: Long
+        now: Long,
+        periodLabel: String = "bulan ini"
     ): List<FinanceAlert> {
         val alerts = mutableListOf<FinanceAlert>()
 
@@ -73,8 +74,8 @@ object FinanceAlertEngine {
 
         if (expenses > income) {
             alerts += FinanceAlert(
-                "Arus kas bulan ini negatif",
-                "Pengeluaran melebihi pemasukan sebesar ${expenses - income} rupiah.",
+                "Arus kas $periodLabel negatif",
+                "Pengeluaran melebihi pemasukan selama $periodLabel sebesar ${expenses - income} rupiah.",
                 FinanceAlertSeverity.WARNING
             )
         }
