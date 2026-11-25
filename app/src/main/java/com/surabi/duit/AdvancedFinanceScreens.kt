@@ -50,6 +50,7 @@ import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.GoalOverviewRow
 import com.surabi.duit.data.LiabilityOverviewRow
+import com.surabi.duit.data.ReceivableOverviewRow
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -194,9 +195,12 @@ fun WealthScreen(
     accounts: List<AccountBalanceRow>,
     goals: List<GoalOverviewRow>,
     assets: List<AssetEntity>,
+    receivables: List<ReceivableOverviewRow>,
     liabilities: List<LiabilityOverviewRow>,
     onAddAccount: () -> Unit,
     onAddAsset: () -> Unit,
+    onAddReceivable: () -> Unit,
+    onCollectReceivable: (ReceivableOverviewRow) -> Unit,
     onAddLiability: () -> Unit,
     onPayLiability: (LiabilityOverviewRow) -> Unit,
     onUpdateAsset: (AssetEntity) -> Unit
@@ -204,6 +208,7 @@ fun WealthScreen(
     val accountsTotal = accounts.sumOf { it.balanceMinor }
     val reservedGoals = goals.sumOf { it.savedMinor }
     val assetsTotal = assets.sumOf { it.currentValueMinor }
+    val receivablesTotal = receivables.sumOf { it.outstandingMinor }
     val debtTotal = liabilities.sumOf { it.outstandingMinor }
     Column(
         Modifier.verticalScroll(rememberScrollState()).padding(16.dp),
@@ -216,9 +221,9 @@ fun WealthScreen(
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("Ringkasan kekayaan terdata", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(financeRupiah(accountsTotal + reservedGoals + assetsTotal - debtTotal), style = MaterialTheme.typography.headlineSmall,
+                Text(financeRupiah(accountsTotal + reservedGoals + assetsTotal + receivablesTotal - debtTotal), style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Saldo akun + dana target + nilai aset non-tunai − sisa utang", style = MaterialTheme.typography.bodySmall,
+                Text("Saldo akun + dana target + aset non-tunai + sisa piutang − sisa utang", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
@@ -256,6 +261,38 @@ fun WealthScreen(
                     }
                     Text("${asset.category.replace('_', ' ')} • Harga perolehan ${financeRupiah(asset.acquisitionCostMinor)}",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.Icon(Icons.Filled.TrendingUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(8.dp))
+            Text("Piutang dan tagihan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Button(onClick = onAddReceivable) { Text("Tambah") }
+        }
+        if (receivables.isEmpty()) EmptyFinanceCard("Belum ada piutang", "Catat tagihan pelanggan atau uang yang harus diterima. Saldo akun hanya bertambah saat pembayaran diterima.")
+        receivables.forEach { receivable ->
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(receivable.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text(financeRupiah(receivable.outstandingMinor),
+                            color = if (receivable.outstandingMinor == 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,
+                            fontWeight = FontWeight.Bold)
+                    }
+                    Text("Kepada ${receivable.counterparty} • Awal ${financeRupiah(receivable.originalAmountMinor)}",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    receivable.dueAt?.let { due ->
+                        Text("Jatuh tempo: " + financeDate(due), style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (receivable.outstandingMinor == 0L) {
+                        Text("Lunas", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    } else {
+                        OutlinedButton(onClick = { onCollectReceivable(receivable) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Catat penerimaan")
+                        }
+                    }
                 }
             }
         }
@@ -500,6 +537,88 @@ fun LiabilityPaymentDialog(
         confirmButton = {
             TextButton(enabled = accountId != 0L && amount.toLongOrNull()?.let { it > 0L && it <= liability.outstandingMinor } == true,
                 onClick = { onSave(accountId, amount.toLong(), note) }) { Text("Catat pembayaran") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    )
+}
+
+@Composable
+fun ReceivableDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String, Long, Long?, String) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var counterparty by remember { mutableStateOf("") }
+    var amount by remember { mutableStateOf("") }
+    var dueDateText by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    val parsedDueDate = parseFinanceDate(dueDateText)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Catat piutang atau tagihan") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Nama tagihan") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(counterparty, { counterparty = it }, label = { Text("Pelanggan / pihak yang berutang") },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(amount, { amount = it.filter(Char::isDigit) }, label = { Text("Nilai piutang (rupiah)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(dueDateText, { dueDateText = it }, label = { Text("Jatuh tempo (dd-MM-yyyy, opsional)") },
+                    singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    supportingText = { if (dueDateText.isNotBlank() && parsedDueDate == null) Text("Gunakan format tanggal dd-MM-yyyy.") })
+                OutlinedTextField(notes, { notes = it }, label = { Text("Catatan (opsional)") },
+                    modifier = Modifier.fillMaxWidth(), minLines = 2)
+                Text("Mencatat piutang tidak menambah saldo rekening. Saldo baru bertambah saat pembayaran benar-benar diterima.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank() && counterparty.isNotBlank() &&
+                    amount.toLongOrNull()?.let { it > 0L } == true &&
+                    (dueDateText.isBlank() || parsedDueDate != null),
+                onClick = { onSave(name, counterparty, amount.toLong(), parsedDueDate, notes) }
+            ) { Text("Simpan piutang") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    )
+}
+
+@Composable
+fun ReceivableCollectionDialog(
+    receivable: ReceivableOverviewRow,
+    accounts: List<AccountBalanceRow>,
+    onDismiss: () -> Unit,
+    onSave: (Long, Long, String) -> Unit
+) {
+    var accountId by remember(accounts) { mutableLongStateOf(accounts.firstOrNull()?.id ?: 0L) }
+    var amount by remember(receivable.id) { mutableStateOf(receivable.outstandingMinor.toString()) }
+    var note by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Terima pembayaran piutang") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text(receivable.name, fontWeight = FontWeight.SemiBold)
+                Text("Pihak: ${receivable.counterparty}", style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Sisa tagihan: ${financeRupiah(receivable.outstandingMinor)}", fontWeight = FontWeight.SemiBold)
+                FinanceIdPicker("Masuk ke akun", accountId, accounts.map { it.id to it.name }, { accountId = it })
+                OutlinedTextField(amount, { amount = it.filter(Char::isDigit) },
+                    label = { Text("Nominal diterima (rupiah)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(note, { note = it }, label = { Text("Catatan (opsional)") },
+                    modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = accountId != 0L &&
+                    amount.toLongOrNull()?.let { it > 0L && it <= receivable.outstandingMinor } == true,
+                onClick = { onSave(accountId, amount.toLong(), note) }
+            ) { Text("Catat penerimaan") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
     )
