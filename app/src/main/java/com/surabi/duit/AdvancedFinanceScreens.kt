@@ -192,6 +192,7 @@ private fun BudgetProgressCardAdvanced(budget: BudgetOverviewRow) {
 @Composable
 fun WealthScreen(
     accounts: List<AccountBalanceRow>,
+    goals: List<GoalOverviewRow>,
     assets: List<AssetEntity>,
     liabilities: List<LiabilityOverviewRow>,
     onAddAccount: () -> Unit,
@@ -201,6 +202,7 @@ fun WealthScreen(
     onUpdateAsset: (AssetEntity) -> Unit
 ) {
     val accountsTotal = accounts.sumOf { it.balanceMinor }
+    val reservedGoals = goals.sumOf { it.savedMinor }
     val assetsTotal = assets.sumOf { it.currentValueMinor }
     val debtTotal = liabilities.sumOf { it.outstandingMinor }
     Column(
@@ -214,9 +216,9 @@ fun WealthScreen(
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("Ringkasan kekayaan terdata", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text(financeRupiah(accountsTotal + assetsTotal - debtTotal), style = MaterialTheme.typography.headlineSmall,
+                Text(financeRupiah(accountsTotal + reservedGoals + assetsTotal - debtTotal), style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Saldo akun + nilai aset terdata − sisa utang", style = MaterialTheme.typography.bodySmall,
+                Text("Saldo akun + dana target + nilai aset non-tunai − sisa utang", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
