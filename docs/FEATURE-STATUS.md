@@ -109,7 +109,7 @@ Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 **Keparahan yang masih terbuka**
 - Modul transaksi umum belum memiliki edit, hapus dengan koreksi, duplikasi/template, lampiran, dan impor.
-- Belum ada pengaturan widget dashboard, penyembunyian saldo global, PIN/biometrik, enkripsi database, maupun backup/restore.
+- PIN/biometrik, penguncian aplikasi, enkripsi database, dan backup/restore penuh belum tersedia; penyamaran nominal hanya perlindungan tampilan.
 - Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
 - Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menangani orkestrasi data dan dialog; komponen header, navigasi, dashboard, grafik, dan tile transaksi kini dipindah ke DuitExperience.kt. Pemisahan alur use-case/state management lebih lanjut masih diperlukan.
 
@@ -130,7 +130,7 @@ Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Edit transaksi umum, riwayat versi detail, dan reversal jurnal double-entry.
 - Rekonsiliasi rekening dan penyesuaian saldo formal.
 - Lampiran struk/dokumen, transaksi berulang/terjadwal/massal, template, dan impor CSV/spreadsheet.
-- Ekspor PDF/Excel/DOCX, laporan profesional, serta ekspor seluruh histori dengan pagination.
+- Ekspor PDF/Excel/DOCX dan laporan profesional.
 - Target dengan jadwal kontribusi otomatis dan notifikasi pengingat.
 - Penyusutan, jadwal pemeliharaan, penjualan/penghapusan aset melalui jurnal.
 - Integrasi piutang dengan invoice/penjualan kredit dan jurnal pendapatan; analisis umur piutang, bunga/denda terstruktur, jadwal cicilan otomatis, serta laporan penagihan lanjutan.

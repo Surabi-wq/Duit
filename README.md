@@ -108,7 +108,7 @@ Catatan cakupan: histori transaksi dan ekspor CSV sekarang memakai pemuatan/penu
 
 Fitur berikut masih menjadi backlog dan tidak boleh dianggap aktif hanya karena ada istilah, komponen, atau rancangan antarmukanya:
 - Rekonsiliasi rekening, penyesuaian saldo formal, edit transaksi umum, transaksi berulang/terjadwal/massal, template, lampiran struk, dan pembatalan melalui reversal jurnal double-entry.
-- Impor CSV/spreadsheet; ekspor laporan PDF/Excel/DOCX; ekspor transaksi tanpa batas/pagination.
+- Impor CSV/spreadsheet; ekspor laporan PDF/Excel/DOCX.
 - Target dengan setoran terjadwal otomatis dan notifikasi.
 - Riwayat nilai aset terstruktur, penyusutan, pemeliharaan, pembelian/penjualan/penghapusan aset yang terhubung ke jurnal.
 - Jadwal cicilan, bunga/denda terstruktur, analisis umur piutang, dan penagihan lanjutan.
@@ -140,7 +140,7 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 4 memiliki migrasi eksplisit dari versi 1 ke 2, versi 2 ke 3, dan versi 3 ke 4. Migrasi 3→4 hanya menambahkan indeks gabungan untuk pencarian/paging transaksi. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.0.0.
+Database Room versi 4 memiliki migrasi eksplisit dari versi 1 ke 2, versi 2 ke 3, dan versi 3 ke 4. Migrasi 3→4 hanya menambahkan indeks gabungan untuk pencarian/paging transaksi. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.1.0.
 
 ## Ekspor CSV dan keamanan spreadsheet
 

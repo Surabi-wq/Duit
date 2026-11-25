@@ -9,7 +9,6 @@ import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
-import androidx.paging.PagingSource
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -120,7 +119,6 @@ data class CategoryEntity(
     ],
     indices = [
         Index(value = ["workspaceId", "occurredAt"]),
-        Index(value = ["workspaceId", "isVoided", "occurredAt", "id"]),
         Index("fromAccountId"),
         Index("toAccountId"),
         Index("categoryId"),
@@ -589,101 +587,6 @@ interface FinanceDao {
         sortOrder: String
     ): Flow<List<TransactionEntity>>
 
-    /**
-     * Database-backed paged search. Room injects LIMIT/OFFSET for PagingSource,
-     * so the UI never materializes the full transaction history in memory.
-     */
-    @Query("""
-        SELECT t.* FROM transactions AS t
-        WHERE t.workspaceId = :workspaceId AND t.isVoided = 0
-          AND (
-              :query = ''
-              OR t.title LIKE '%' || :query || '%'
-              OR t.note LIKE '%' || :query || '%'
-              OR EXISTS (
-                  SELECT 1 FROM categories AS c
-                  WHERE c.id = t.categoryId
-                    AND c.workspaceId = t.workspaceId
-                    AND c.name LIKE '%' || :query || '%'
-              )
-          )
-          AND (
-              :type = 'ALL'
-              OR (:type = 'OTHER' AND t.type NOT IN ('INCOME', 'EXPENSE', 'TRANSFER'))
-              OR t.type = :type
-          )
-          AND t.occurredAt BETWEEN :startAt AND :endAt
-          AND (:accountId IS NULL OR t.fromAccountId = :accountId OR t.toAccountId = :accountId)
-          AND (:categoryId IS NULL OR t.categoryId = :categoryId)
-          AND (:minAmount IS NULL OR t.amountMinor >= :minAmount)
-          AND (:maxAmount IS NULL OR t.amountMinor <= :maxAmount)
-        ORDER BY
-          CASE WHEN :sortOrder = 'OLDEST' THEN t.occurredAt END ASC,
-          CASE WHEN :sortOrder = 'AMOUNT_ASC' THEN t.amountMinor END ASC,
-          CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amountMinor END DESC,
-          t.occurredAt DESC,
-          t.id DESC
-    """)
-    fun pagingSearchTransactions(
-        workspaceId: Long,
-        query: String,
-        type: String,
-        startAt: Long,
-        endAt: Long,
-        accountId: Long?,
-        categoryId: Long?,
-        minAmount: Long?,
-        maxAmount: Long?,
-        sortOrder: String
-    ): PagingSource<Int, TransactionEntity>
-
-    @Query("""
-        SELECT t.* FROM transactions AS t
-        WHERE t.workspaceId = :workspaceId AND t.isVoided = 0
-          AND (
-              :query = ''
-              OR t.title LIKE '%' || :query || '%'
-              OR t.note LIKE '%' || :query || '%'
-              OR EXISTS (
-                  SELECT 1 FROM categories AS c
-                  WHERE c.id = t.categoryId
-                    AND c.workspaceId = t.workspaceId
-                    AND c.name LIKE '%' || :query || '%'
-              )
-          )
-          AND (
-              :type = 'ALL'
-              OR (:type = 'OTHER' AND t.type NOT IN ('INCOME', 'EXPENSE', 'TRANSFER'))
-              OR t.type = :type
-          )
-          AND t.occurredAt BETWEEN :startAt AND :endAt
-          AND (:accountId IS NULL OR t.fromAccountId = :accountId OR t.toAccountId = :accountId)
-          AND (:categoryId IS NULL OR t.categoryId = :categoryId)
-          AND (:minAmount IS NULL OR t.amountMinor >= :minAmount)
-          AND (:maxAmount IS NULL OR t.amountMinor <= :maxAmount)
-        ORDER BY
-          CASE WHEN :sortOrder = 'OLDEST' THEN t.occurredAt END ASC,
-          CASE WHEN :sortOrder = 'AMOUNT_ASC' THEN t.amountMinor END ASC,
-          CASE WHEN :sortOrder = 'AMOUNT_DESC' THEN t.amountMinor END DESC,
-          t.occurredAt DESC,
-          t.id DESC
-        LIMIT :limit OFFSET :offset
-    """)
-    suspend fun exportSearchTransactionsPage(
-        workspaceId: Long,
-        query: String,
-        type: String,
-        startAt: Long,
-        endAt: Long,
-        accountId: Long?,
-        categoryId: Long?,
-        minAmount: Long?,
-        maxAmount: Long?,
-        sortOrder: String,
-        limit: Int,
-        offset: Int
-    ): List<TransactionEntity>
-
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertBudget(budget: BudgetEntity): Long
 
@@ -724,7 +627,7 @@ interface FinanceDao {
         ReceivableEntity::class,
         AuditLogEntity::class
     ],
-    version = 4,
+    version = 3,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -821,16 +724,6 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                // Composite index supports workspace-scoped non-voided transaction paging.
-                database.execSQL(
-                    "CREATE INDEX IF NOT EXISTS index_transactions_workspaceId_isVoided_occurredAt_id " +
-                        "ON transactions(workspaceId, isVoided, occurredAt, id)"
-                )
-            }
-        }
-
         @Volatile
         private var INSTANCE: FinanceDatabase? = null
 
@@ -840,7 +733,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "duit-local.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
         }
     }

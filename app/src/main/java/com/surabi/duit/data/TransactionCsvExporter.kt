@@ -5,49 +5,46 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Writes spreadsheet-safe CSV data. The streaming methods support bounded
- * database batches; text cells are protected against formula injection.
+ * Builds a spreadsheet-safe CSV snapshot for the transaction rows currently
+ * shown to the user. Text cells are protected against formula injection.
  */
 object TransactionCsvExporter {
     fun toCsv(
         transactions: List<TransactionEntity>,
         accountNames: Map<Long, String>,
         categoryNames: Map<Long, String>
-    ): String = buildString {
-        appendHeader(this)
-        appendRows(this, transactions, accountNames, categoryNames)
-    }
-
-    fun appendHeader(target: Appendable) {
-        target.append('\uFEFF')
-        target.append(
-            listOf(
-                "ID", "Tanggal dan waktu", "Jenis", "Keterangan", "Akun sumber",
-                "Akun tujuan", "Kategori", "Nominal (IDR)", "Catatan"
-            ).joinToString(",") { csvCell(it) }
-        ).append('\n')
-    }
-
-    fun appendRows(
-        target: Appendable,
-        transactions: List<TransactionEntity>,
-        accountNames: Map<Long, String>,
-        categoryNames: Map<Long, String>
-    ) {
+    ): String {
         val dateFormatter = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
-        transactions.forEach { transaction ->
-            val values = listOf(
-                transaction.id.toString(),
-                dateFormatter.format(Date(transaction.occurredAt)),
-                transactionTypeLabel(transaction.type),
-                transaction.title,
-                accountNames[transaction.fromAccountId].orEmpty(),
-                transaction.toAccountId?.let { accountNames[it] }.orEmpty(),
-                transaction.categoryId?.let { categoryNames[it] }.orEmpty(),
-                transaction.amountMinor.toString(),
-                transaction.note
+        return buildString {
+            append('\uFEFF')
+            appendLine(
+                listOf(
+                    "ID",
+                    "Tanggal dan waktu",
+                    "Jenis",
+                    "Keterangan",
+                    "Akun sumber",
+                    "Akun tujuan",
+                    "Kategori",
+                    "Nominal (IDR)",
+                    "Catatan"
+                ).joinToString(",") { csvCell(it) }
             )
-            target.append(values.joinToString(",") { csvCell(it) }).append('\n')
+
+            transactions.forEach { transaction ->
+                val values = listOf(
+                    transaction.id.toString(),
+                    dateFormatter.format(Date(transaction.occurredAt)),
+                    transactionTypeLabel(transaction.type),
+                    transaction.title,
+                    accountNames[transaction.fromAccountId].orEmpty(),
+                    transaction.toAccountId?.let { accountNames[it] }.orEmpty(),
+                    transaction.categoryId?.let { categoryNames[it] }.orEmpty(),
+                    transaction.amountMinor.toString(),
+                    transaction.note
+                )
+                appendLine(values.joinToString(",") { csvCell(it) })
+            }
         }
     }
 

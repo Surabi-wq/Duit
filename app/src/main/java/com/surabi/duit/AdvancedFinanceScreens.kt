@@ -42,7 +42,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import com.surabi.duit.ui.LocalDuitBalancesVisible
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -919,9 +918,7 @@ private fun parseFinanceDate(input: String): Long? {
 private fun financeDate(value: Long): String =
     java.text.SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(java.util.Date(value))
 
-@Composable
 private fun financeRupiah(value: Long): String {
-    if (!LocalDuitBalancesVisible.current) return "••••••"
     return NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
         maximumFractionDigits = 0
         minimumFractionDigits = 0

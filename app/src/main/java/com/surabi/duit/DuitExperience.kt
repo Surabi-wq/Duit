@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -35,11 +34,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallet
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,10 +47,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,10 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -75,7 +64,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.surabi.duit.data.AccountBalanceRow
@@ -90,7 +78,6 @@ import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.WorkspaceEntity
-import com.surabi.duit.ui.LocalDuitBalancesVisible
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -109,9 +96,7 @@ internal fun DuitAppHeader(
     workspaces: List<WorkspaceEntity>,
     selectedId: Long,
     onWorkspaceSelected: (Long) -> Unit,
-    onAddWorkspace: () -> Unit,
-    balancesVisible: Boolean,
-    onToggleBalances: () -> Unit
+    onAddWorkspace: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val current = workspaces.firstOrNull { it.id == selectedId }
@@ -134,13 +119,6 @@ internal fun DuitAppHeader(
                 Text("MANAJEMEN KEUANGAN", style = MaterialTheme.typography.labelSmall,
                     color = DuitMuted, maxLines = 1)
             }
-            IconButton(onClick = onToggleBalances, modifier = Modifier.size(48.dp)) {
-                Icon(
-                    imageVector = if (balancesVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                    contentDescription = if (balancesVisible) "Sembunyikan nominal" else "Tampilkan nominal",
-                    tint = DuitGreen
-                )
-            }
             Box {
                 FilledTonalButton(
                     onClick = { expanded = true },
@@ -162,12 +140,10 @@ internal fun DuitAppHeader(
                     if (workspaces.isEmpty()) {
                         DropdownMenuItem(text = { Text("Memuat workspace…") }, onClick = { expanded = false })
                     }
-                    DropdownMenuItem(
-                        text = { Text("Tambah workspace") },
-                        leadingIcon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                        onClick = { expanded = false; onAddWorkspace() }
-                    )
                 }
+            }
+            IconButton(onClick = onAddWorkspace, modifier = Modifier.size(42.dp)) {
+                Icon(Icons.Filled.Add, contentDescription = "Tambah workspace", tint = DuitGreen)
             }
         }
     }
@@ -189,32 +165,28 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             navigation.forEachIndexed { index, item ->
-                val isCurrent = selectedIndex == index
+                val selected = selectedIndex == index
                 Column(
                     modifier = Modifier.weight(1f)
                         .clip(RoundedCornerShape(15.dp))
                         .clickable { onSelect(index) }
-                        .semantics(mergeDescendants = true) {
-                            role = Role.Tab
-                            this.selected = isCurrent
-                        }
                         .padding(horizontal = 2.dp, vertical = 3.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(Modifier.width(28.dp).height(3.dp)
-                        .background(if (isCurrent) DuitGreen else Color.Transparent, CircleShape))
+                        .background(if (selected) DuitGreen else Color.Transparent, CircleShape))
                     Box(
                         Modifier.size(width = 45.dp, height = 29.dp)
-                            .background(if (isCurrent) Color(0xFFDFF4E8) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            .background(if (selected) Color(0xFFDFF4E8) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(item.second, contentDescription = item.first,
-                            tint = if (isCurrent) DuitGreen else Color(0xFF819087), modifier = Modifier.size(20.dp))
+                            tint = if (selected) DuitGreen else Color(0xFF819087), modifier = Modifier.size(20.dp))
                     }
                     Text(item.first, style = MaterialTheme.typography.labelSmall,
-                        color = if (isCurrent) DuitGreen else Color(0xFF78877F),
-                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
+                        color = if (selected) DuitGreen else Color(0xFF78877F),
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
         }
@@ -243,18 +215,6 @@ internal fun DuitDashboardScreen(
     onOpenTransactions: () -> Unit
 ) {
     val totalBalance = accounts.sumOf { it.balanceMinor }
-    val balancesVisible = LocalDuitBalancesVisible.current
-    val context = LocalContext.current
-    val widgetPreferences = remember {
-        context.getSharedPreferences("duit-dashboard-widgets", Context.MODE_PRIVATE)
-    }
-    var showWidgetSettings by remember { mutableStateOf(false) }
-    var showTrend by remember { mutableStateOf(widgetPreferences.getBoolean("show_trend", true)) }
-    var showAccounts by remember { mutableStateOf(widgetPreferences.getBoolean("show_accounts", true)) }
-    var showPlanning by remember { mutableStateOf(widgetPreferences.getBoolean("show_planning", true)) }
-    var showAlerts by remember { mutableStateOf(widgetPreferences.getBoolean("show_alerts", true)) }
-    var showDueDates by remember { mutableStateOf(widgetPreferences.getBoolean("show_due_dates", true)) }
-    var showRecentActivity by remember { mutableStateOf(widgetPreferences.getBoolean("show_recent_activity", true)) }
     val alerts = remember(accounts, budgets, liabilities, receivables, income, expenses, period) {
         FinanceAlertEngine.evaluate(
             accounts, budgets, liabilities, receivables, income, expenses,
@@ -291,10 +251,8 @@ internal fun DuitDashboardScreen(
                     fontWeight = FontWeight.ExtraBold, color = DuitInk)
                 Text("$workspaceName  •  $todayText", style = MaterialTheme.typography.bodySmall, color = DuitMuted)
             }
-            Surface(shape = CircleShape, color = Color(0xFFE1F2E8), modifier = Modifier.size(48.dp)) {
-                IconButton(onClick = { showWidgetSettings = true }, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Filled.Tune, contentDescription = "Atur widget dashboard", tint = DuitGreen)
-                }
+            Box(Modifier.size(46.dp).background(Color(0xFFE1F2E8), CircleShape), contentAlignment = Alignment.Center) {
+                Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null, tint = DuitGreen, modifier = Modifier.size(23.dp))
             }
         }
 
@@ -318,7 +276,7 @@ internal fun DuitDashboardScreen(
                 DashboardPeriodResolver.label(period), Modifier.weight(1f))
         }
 
-        if (showTrend) DuitMonthlyTrendCard(points = trend)
+        DuitMonthlyTrendCard(points = trend)
 
         Text("Akses cepat", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = DuitInk)
         Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.fillMaxWidth()) {
@@ -327,7 +285,6 @@ internal fun DuitDashboardScreen(
             DuitQuickAction("Aset", Icons.Filled.Wallet, Color(0xFFFFF0D9), Color(0xFFB96E0C), onOpenWealth, Modifier.weight(1f))
         }
 
-        if (showAccounts) {
         DuitDashboardSectionHeader("Dompet dan rekening", "Saldo tiap akun", "Semua akun", onOpenWealth)
         if (accounts.isEmpty()) {
             DuitEmptyState(title = "Belum ada dompet atau rekening",
@@ -336,8 +293,6 @@ internal fun DuitDashboardScreen(
             accounts.take(3).forEach { DuitAccountRow(it) }
         }
 
-        }
-        if (showPlanning) {
         DuitDashboardSectionHeader("Rencana berjalan", "Anggaran dan sasaran tabungan", "Kelola", onOpenPlanning)
         if (budgets.isEmpty() && goals.isEmpty()) {
             DuitEmptyState(title = "Belum ada rencana keuangan",
@@ -348,8 +303,7 @@ internal fun DuitDashboardScreen(
             goals.take(2).forEach { DuitGoalSnapshot(it) }
         }
 
-        }
-        if (showAlerts && alerts.isNotEmpty()) {
+        if (alerts.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 DuitDashboardSectionHeader("Perlu perhatian", "Peringatan berbasis catatan keuangan lokal", null, null)
                 alerts.take(3).forEach { alert ->
@@ -360,17 +314,14 @@ internal fun DuitDashboardScreen(
                         Icon(Icons.Filled.Info, contentDescription = "Peringatan", tint = if (isCritical) DuitRed else DuitAmber)
                         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                             Text(alert.title, fontWeight = FontWeight.Bold, color = DuitInk)
-                            Text(
-                                if (balancesVisible) alert.message else "Rincian nominal disembunyikan. Tampilkan saldo untuk melihat nilainya.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DuitMuted
-                            )
+                            Text(alert.message, style = MaterialTheme.typography.bodySmall, color = DuitMuted)
                         }
                     }
                 }
             }
         }
-        if (showDueDates && dueRows.isNotEmpty()) {
+
+        if (dueRows.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 DuitDashboardSectionHeader("Jatuh tempo mendatang", "Data dari utang dan piutang aktif", null, null)
                 dueRows.forEach { (kind, name, dueAt) ->
@@ -392,7 +343,6 @@ internal fun DuitDashboardScreen(
             }
         }
 
-        if (showRecentActivity) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Aktivitas terbaru", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = DuitInk)
@@ -406,53 +356,7 @@ internal fun DuitDashboardScreen(
         } else {
             transactions.take(4).forEach { DuitTransactionTile(item = it) }
         }
-        }
         Spacer(Modifier.height(82.dp))
-    }
-    if (showWidgetSettings) {
-        AlertDialog(
-            onDismissRequest = { showWidgetSettings = false },
-            title = { Text("Atur dashboard") },
-            text = {
-                Column(
-                    Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("Pilih ringkasan yang ingin ditampilkan. Pengaturan disimpan di perangkat ini.",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    DashboardWidgetToggle("Tren arus kas", showTrend) {
-                        showTrend = it; widgetPreferences.edit().putBoolean("show_trend", it).apply()
-                    }
-                    DashboardWidgetToggle("Dompet dan rekening", showAccounts) {
-                        showAccounts = it; widgetPreferences.edit().putBoolean("show_accounts", it).apply()
-                    }
-                    DashboardWidgetToggle("Anggaran dan target", showPlanning) {
-                        showPlanning = it; widgetPreferences.edit().putBoolean("show_planning", it).apply()
-                    }
-                    DashboardWidgetToggle("Peringatan keuangan", showAlerts) {
-                        showAlerts = it; widgetPreferences.edit().putBoolean("show_alerts", it).apply()
-                    }
-                    DashboardWidgetToggle("Jatuh tempo", showDueDates) {
-                        showDueDates = it; widgetPreferences.edit().putBoolean("show_due_dates", it).apply()
-                    }
-                    DashboardWidgetToggle("Aktivitas terbaru", showRecentActivity) {
-                        showRecentActivity = it; widgetPreferences.edit().putBoolean("show_recent_activity", it).apply()
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showWidgetSettings = false }) { Text("Selesai") } }
-        )
-    }
-}
-
-@Composable
-private fun DashboardWidgetToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
@@ -752,24 +656,17 @@ internal fun DuitTransactionTile(
     }
 }
 
-@Composable
-private fun duitMoney(value: Long): String {
-    if (!LocalDuitBalancesVisible.current) return "••••••"
-    return NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
+private fun duitMoney(value: Long): String =
+    NumberFormat.getCurrencyInstance(Locale("id", "ID")).apply {
         maximumFractionDigits = 0
         minimumFractionDigits = 0
     }.format(value)
-}
 
-@Composable
-private fun duitCompactMoney(value: Long): String {
-    if (!LocalDuitBalancesVisible.current) return "••••••"
-    return when {
+private fun duitCompactMoney(value: Long): String = when {
     value >= 1_000_000_000L -> "Rp ${"%.1f".format(Locale.US, value / 1_000_000_000.0)} M"
     value >= 1_000_000L -> "Rp ${"%.1f".format(Locale.US, value / 1_000_000.0)} jt"
     value >= 1_000L -> "Rp ${"%.0f".format(Locale.US, value / 1_000.0)} rb"
     else -> duitMoney(value)
-    }
 }
 
 private fun duitTransactionTypeLabel(type: String): String = when (type) {
