@@ -23,7 +23,7 @@ Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ### Transaksi dan kontrol data
 - Pemasukan, pengeluaran, dan transfer antar-akun.
-- Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi; hasil dibatasi 500 transaksi terbaru yang cocok.
+- Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi; histori di layar ditampilkan dengan Paging 3 secara bertahap.
 - Filter berdasarkan jenis, rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, dan pengurutan tanggal atau nominal.
 - Validasi rentang tanggal menolak tanggal kalender tidak valid, teks tambahan, dan rentang awal yang melebihi tanggal akhir.
 - Filter divalidasi pada repository dan query dijalankan pada database; pencarian tidak memuat seluruh histori transaksi ke memori.
@@ -95,12 +95,12 @@ Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Grafik bulanan menggunakan agregasi SQL pada tabel transaksi yang difilter per workspace, periode enam bulan, dan isVoided=0. Hanya baris agregat bulan (maksimal enam) yang dikirim ke UI; tidak mengambil seluruh histori dan tidak menggunakan batas 200 transaksi pada daftar.
 - Tile transaksi dirombak dengan ikon jenis transaksi, nominal yang menonjol, akun, kategori, catatan, serta waktu. Query, pencarian, filter, detail, pembatalan/void, audit log, dan ekspor tetap mempertahankan alur sebelumnya.
 - Perencanaan dan aset diberi latar halaman khusus, banner finansial kontras tinggi, serta kartu progres yang menampilkan angka utama lebih jelas.
-- Tidak ada perubahan entity/schema Room, version database, migrasi, saldo, transfer, rumus cashflow, atau formula kekayaan bersih. Query tren hanya agregasi baca.
+- Versi 1.1.0 menambah indeks lewat migrasi Room 3→4; tidak mengubah saldo, transfer, rumus cashflow, atau formula kekayaan bersih. Query tren hanya agregasi baca.
 
 ## Temuan audit UI/UX dan status penanganan
 
 **Keparahan tinggi**
-- Riwayat transaksi hanya memuat maksimal 500 hasil. Pengelompokan tanggal dan detail telah ditambahkan, tetapi pagination/muat bertahap untuk ribuan transaksi masih belum ditangani.
+- Ekspor CSV versi lama pernah terbatas 500 baris. Versi 1.1.0 mengganti ekspor itu menjadi penulisan bertahap seluruh hasil filter dan mengganti tampilan histori menjadi Paging 3.
 - Aplikasi belum memiliki backup/restore database penuh tervalidasi; ekspor CSV tetap bukan cadangan penuh.
 
 **Keparahan sedang**
