@@ -22,7 +22,7 @@ object TransactionDateRange {
         val cleanEnd = endDate.trim()
 
         val startAt = if (cleanStart.isEmpty()) {
-            0L
+            Long.MIN_VALUE
         } else {
             parseStartOfDay(cleanStart) ?: return null
         }
