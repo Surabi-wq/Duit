@@ -394,7 +394,7 @@ interface FinanceDao {
         SELECT * FROM transactions
         WHERE workspaceId = :workspaceId AND isVoided = 0
         ORDER BY occurredAt DESC, id DESC
-        LIMIT 200
+        LIMIT 20
     """)
     fun observeTransactions(workspaceId: Long): Flow<List<TransactionEntity>>
 
