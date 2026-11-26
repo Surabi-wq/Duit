@@ -2,6 +2,13 @@
 
 Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lokal. Identitas visual menggunakan hijau, putih, dan biru. Data inti disimpan secara lokal melalui Room/SQLite; alur inti aplikasi tidak memerlukan koneksi internet.
 
+## Landasan dasar resmi pengembangan
+
+**Duit 1.5.0 ditetapkan sebagai baseline resmi** untuk seluruh pembuatan, perbaikan, dan update berikutnya. Pengembangan wajib dilanjutkan secara inkremental dari source ini, mempertahankan fitur dan data yang sudah berfungsi, menjaga rumus/validasi keuangan, serta memakai migrasi Room non-destruktif.
+
+Dokumen acuan wajib: [Landasan Dasar Resmi Pengembangan Duit](docs/BASELINE-APPLICATION.md). Dokumen tersebut menetapkan kemampuan yang harus dipertahankan, prosedur perubahan database, standar pengujian, syarat Release APK, dan definisi selesai. Jangan memulai ulang aplikasi dari source lain atau menghilangkan fungsi baseline tanpa instruksi eksplisit.
+
+
 ## Versi source
 
 - Versi: **1.5.0**
