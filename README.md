@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **1.3.0**
+- Versi: **1.3.1**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -13,6 +13,14 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Penyimpanan: Room di atas SQLite
 - Database Room: versi 5
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
+
+## Perbaikan versi 1.3.1 — keandalan restore dan konsistensi perhitungan
+
+- Repository dan seluruh kolektor Flow UI dibuat ulang setelah restore sukses agar layar berpindah ke instance Room yang baru; ini mencegah UI tetap membaca database yang sudah ditutup.
+- Proses restore membatasi ukuran manifest dan database hasil ekstraksi, memvalidasi format manifest secara ketat, memeriksa integrity SQLite serta foreign key, dan memverifikasi database setelah dibuka kembali oleh Room.
+- Salinan pengaman untuk rollback disimpan di direktori privat aplikasi yang tidak dibersihkan bersama cache. Jika pemulihan otomatis gagal, salinan pengaman dipertahankan dan lokasinya dilaporkan.
+- Perhitungan kekayaan bersih pada dashboard dan halaman aset memakai satu kalkulator yang sama. Rumus tetap saldo akun + dana target teralokasi + aset non-tunai + piutang − kewajiban; dua pengujian unit menutup skenario dana target dan kewajiban.
+- Progres target melindungi tampilan dari target bernilai nol pada data lama/arsip yang tidak valid. Tidak ada perubahan skema Room atau rumus saldo transaksi.
 
 ## Fitur baru versi 1.3.0 — jadwal transaksi berulang
 
@@ -124,7 +132,7 @@ Catatan cakupan: histori transaksi dan ekspor CSV sekarang memakai pemuatan/penu
 ## Fitur yang belum tersedia sebagai fungsi lengkap
 
 Fitur berikut masih menjadi backlog dan tidak boleh dianggap aktif hanya karena ada istilah, komponen, atau rancangan antarmukanya:
-- Rekonsiliasi rekening, penyesuaian saldo formal, edit transaksi umum, transaksi berulang/terjadwal/massal, template, lampiran struk, dan pembatalan melalui reversal jurnal double-entry.
+- Rekonsiliasi rekening, penyesuaian saldo formal, edit transaksi umum, transaksi massal, template transaksi umum, lampiran struk, dan pembatalan melalui reversal jurnal double-entry. Jadwal berulang yang tersedia masih dicatat secara eksplisit oleh pengguna, bukan diposting otomatis.
 - Impor CSV/spreadsheet; ekspor laporan PDF/Excel/DOCX.
 - Target dengan setoran terjadwal otomatis dan notifikasi.
 - Riwayat nilai aset terstruktur, penyusutan, pemeliharaan, pembelian/penjualan/penghapusan aset yang terhubung ke jurnal.
@@ -134,7 +142,7 @@ Fitur berikut masih menjadi backlog dan tidak boleh dianggap aktif hanya karena 
 - Portofolio investasi lengkap, harga pasar otomatis, dividen, obligasi, dan analisis alokasi.
 - Pajak, invoice/kwitansi profesional, arsip dokumen, serta dokumen administrasi.
 - Grafik lanjutan, perbandingan periode/workspace, analisis prediktif, simulasi, OCR lokal, dan asisten bahasa sehari-hari.
-- Multi-user, role/permission, persetujuan berjenjang, PIN/biometrik, enkripsi database, pengamanan lampiran, dan backup/restore terenkripsi dengan checksum.
+- Multi-user, role/permission, persetujuan berjenjang, PIN/biometrik, enkripsi database, pengamanan lampiran, backup terenkripsi, backup terjadwal/riwayat, backup selektif workspace, serta backup file lampiran.
 - Personalisasi lengkap, tema gelap/sistem, mode pemula/mahir, dan multi-mata uang.
 
 Lihat [docs/FEATURE-STATUS.md](docs/FEATURE-STATUS.md) untuk status yang lebih terperinci dan gerbang penerimaan.
@@ -149,15 +157,17 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.3.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.3.1.apk**.
 
 ## Signing dan distribusi
 
 Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian internal. APK ini dapat dipasang untuk pengujian, tetapi **belum ditandatangani dengan kunci rilis privat** untuk distribusi komersial atau pembaruan jangka panjang. Sebelum distribusi, buat keystore rilis, simpan kredensialnya sebagai secret CI, dan konfigurasi signing release. Jangan pernah commit keystore atau password ke repository.
 
-## Database dan kompatibilitas
+## Database, backup, dan kompatibilitas
 
-Database Room versi 4 memiliki migrasi eksplisit dari versi 1 ke 2, versi 2 ke 3, dan versi 3 ke 4. Migrasi 3→4 hanya menambahkan indeks gabungan untuk pencarian/paging transaksi. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.1.0.
+Database saat ini menggunakan Room versi 5 dengan migrasi eksplisit 1→2, 2→3, 3→4, dan 4→5. Migrasi 3→4 menambah indeks gabungan untuk paging transaksi; migrasi 4→5 menambah tabel dan indeks template transaksi berulang. Tidak ada destructive migration. Perubahan skema berikutnya wajib menambahkan migrasi serta pengujian upgrade.
+
+Menu **Tambah → Backup & restore database** membuat arsip ZIP berisi database Room penuh dan manifest format/ukuran/SHA-256 melalui Android Storage Access Framework. Restore memvalidasi arsip, checksum, integritas SQLite, foreign key, dan versi skema; database aktif disalin sebagai cadangan pengaman sebelum penggantian. Fitur ini bekerja lokal tanpa internet. Batas saat ini: arsip ZIP belum dienkripsi; lampiran file belum disertakan; belum ada backup terjadwal, riwayat backup di dalam aplikasi, atau pemulihan selektif per workspace. SHA-256 mendeteksi kerusakan/perubahan, bukan menggantikan enkripsi maupun autentikasi asal file. Simpan file backup di lokasi tepercaya. Backup/restore database penuh tersedia sejak versi 1.3.0 dengan batasan yang dijelaskan pada bagian Database, backup, dan kompatibilitas.
 
 ## Ekspor CSV dan keamanan spreadsheet
 
