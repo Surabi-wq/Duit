@@ -144,9 +144,11 @@ class MainActivity : ComponentActivity() {
         window.navigationBarColor = android.graphics.Color.WHITE
         window.decorView.systemUiVisibility =
             window.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        val repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
         val displayPreferences = getSharedPreferences("duit-display-preferences", MODE_PRIVATE)
         setContent {
+            var repository by remember {
+                mutableStateOf(FinanceRepository(FinanceDatabase.getInstance(applicationContext)))
+            }
             var balancesVisible by remember {
                 mutableStateOf(displayPreferences.getBoolean("balances_visible", true))
             }
@@ -154,6 +156,9 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalDuitBalancesVisible provides balancesVisible) {
                     DuitApp(
                         repository = repository,
+                        onDatabaseReplaced = {
+                            repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
+                        },
                         balancesVisible = balancesVisible,
                         onBalancesVisibleChange = { visible ->
                             balancesVisible = visible
@@ -181,6 +186,7 @@ private enum class AppTab(
 @Composable
 private fun DuitApp(
     repository: FinanceRepository,
+    onDatabaseReplaced: () -> Unit,
     balancesVisible: Boolean,
     onBalancesVisibleChange: (Boolean) -> Unit
 ) {
@@ -272,26 +278,26 @@ private fun DuitApp(
 
     val workspaceId = selectedWorkspaceId
     val selectedWorkspace = workspaces.firstOrNull { it.id == workspaceId }
-    val accounts by remember(workspaceId) { repository.accounts(workspaceId) }.collectAsState(initial = emptyList())
-    val categories by remember(workspaceId) { repository.categories(workspaceId) }.collectAsState(initial = emptyList())
-    val transactions by remember(workspaceId) { repository.transactions(workspaceId) }.collectAsState(initial = emptyList())
-    val budgets by remember(workspaceId) { repository.budgets(workspaceId) }.collectAsState(initial = emptyList())
-    val goals by remember(workspaceId) { repository.goals(workspaceId) }.collectAsState(initial = emptyList())
-    val assets by remember(workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
-    val liabilities by remember(workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
-    val receivables by remember(workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
-    val recurringTemplates by remember(workspaceId) { repository.recurringTemplates(workspaceId) }.collectAsState(initial = emptyList())
+    val accounts by remember(repository, workspaceId) { repository.accounts(workspaceId) }.collectAsState(initial = emptyList())
+    val categories by remember(repository, workspaceId) { repository.categories(workspaceId) }.collectAsState(initial = emptyList())
+    val transactions by remember(repository, workspaceId) { repository.transactions(workspaceId) }.collectAsState(initial = emptyList())
+    val budgets by remember(repository, workspaceId) { repository.budgets(workspaceId) }.collectAsState(initial = emptyList())
+    val goals by remember(repository, workspaceId) { repository.goals(workspaceId) }.collectAsState(initial = emptyList())
+    val assets by remember(repository, workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
+    val liabilities by remember(repository, workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
+    val receivables by remember(repository, workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
+    val recurringTemplates by remember(repository, workspaceId) { repository.recurringTemplates(workspaceId) }.collectAsState(initial = emptyList())
 
     val dashboardRange = remember(dashboardPeriod) { DashboardPeriodResolver.bounds(dashboardPeriod) }
-    val income by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
+    val income by remember(repository, workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
         repository.income(workspaceId, dashboardRange.startAt, dashboardRange.endAt)
     }.collectAsState(initial = 0L)
-    val expenses by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
+    val expenses by remember(repository, workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
         repository.expenses(workspaceId, dashboardRange.startAt, dashboardRange.endAt)
     }.collectAsState(initial = 0L)
 
     val trendRange = remember(workspaceId) { com.surabi.duit.data.DashboardTrendResolver.bounds() }
-    val monthlyCashflow by remember(workspaceId, trendRange.startAt, trendRange.endAt) {
+    val monthlyCashflow by remember(repository, workspaceId, trendRange.startAt, trendRange.endAt) {
         repository.monthlyCashflow(workspaceId, trendRange.startAt, trendRange.endAt)
     }.collectAsState(initial = emptyList())
     val trendPoints = remember(monthlyCashflow) {
@@ -520,6 +526,7 @@ private fun DuitApp(
                         } }
                         backupBusy = false
                         result.onSuccess {
+                            onDatabaseReplaced()
                             initializationAttempt++
                             showBackupDialog = false
                             snackbar.showSnackbar("Restore berhasil; database berhasil diverifikasi.")
@@ -1652,8 +1659,8 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
             "Saldo akun juga dipengaruhi saldo awal, transfer, setoran/penarikan target, pencairan pinjaman, pembayaran utang, dan penerimaan piutang. Beberapa aliran tersebut bukan pendapatan atau biaya."
         )
         GuideCard(
-            "Apakah ekspor CSV mencadangkan seluruh aplikasi?",
-            "Tidak. CSV menulis seluruh hasil transaksi yang cocok dengan filter aktif secara bertahap. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
+            "Bagaimana membuat backup dan memulihkan database?",
+            "Buka menu Tambah lalu pilih Backup & restore database. Buat backup untuk menyimpan seluruh database lokal Duit ke arsip ZIP dengan manifest dan checksum SHA-256. Untuk pemulihan, pilih arsip ZIP Duit dan konfirmasikan penggantian database aktif. Backup saat ini belum dienkripsi dan belum menyertakan file lampiran; simpan arsip di lokasi tepercaya. CSV tetap hanya untuk ekspor transaksi sesuai filter."
         )
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
