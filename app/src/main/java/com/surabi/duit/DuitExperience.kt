@@ -194,6 +194,7 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
                     modifier = Modifier.weight(1f)
                         .clip(RoundedCornerShape(15.dp))
                         .clickable { onSelect(index) }
+                        .heightIn(min = 48.dp)
                         .semantics(mergeDescendants = true) {
                             role = Role.Tab
                             this.selected = isCurrent
@@ -279,8 +280,8 @@ internal fun DuitDashboardScreen(
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(DuitCanvas).verticalScroll(rememberScrollState())
+    DuitResponsiveColumn(
+        modifier = Modifier.background(DuitCanvas).verticalScroll(rememberScrollState())
             .padding(horizontal = 17.dp, vertical = 17.dp),
         verticalArrangement = Arrangement.spacedBy(19.dp)
     ) {
