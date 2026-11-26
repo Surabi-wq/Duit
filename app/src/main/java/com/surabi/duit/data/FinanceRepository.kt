@@ -22,6 +22,9 @@ class FinanceRepository(private val database: FinanceDatabase) {
     fun transactions(workspaceId: Long): Flow<List<TransactionEntity>> =
         dao.observeTransactions(workspaceId)
 
+    fun recurringTemplates(workspaceId: Long): Flow<List<RecurringTemplateEntity>> =
+        dao.observeRecurringTemplates(workspaceId)
+
     fun pagedSearchTransactions(
         workspaceId: Long,
         query: String,
@@ -310,6 +313,113 @@ class FinanceRepository(private val database: FinanceDatabase) {
             )
             dao.insertAuditLog(AuditLogEntity(workspaceId, "TRANSACTION", id, "CREATE", "Transaksi $type: $cleanTitle", now))
             id
+        }
+    }
+
+    suspend fun createRecurringTemplate(
+        workspaceId: Long, type: String, amount: Long, title: String,
+        fromAccountId: Long, toAccountId: Long?, categoryId: Long?, note: String,
+        cadence: String, intervalCount: Int, firstDueAt: Long
+    ): Long {
+        val cleanTitle = title.trim()
+        require(type in setOf("INCOME", "EXPENSE", "TRANSFER")) { "Jenis transaksi jadwal tidak valid." }
+        require(amount > 0L) { "Nominal jadwal harus lebih besar dari nol." }
+        require(cleanTitle.isNotEmpty() && cleanTitle.length <= 100) { "Keterangan wajib diisi dan maksimal 100 karakter." }
+        require(note.length <= 500) { "Catatan maksimal 500 karakter." }
+        require(cadence in RecurringSchedulePolicy.supportedCadences) { "Frekuensi jadwal tidak valid." }
+        require(intervalCount in 1..36) { "Interval jadwal harus antara 1 dan 36." }
+        require(firstDueAt > 0L) { "Tanggal mulai jadwal tidak valid." }
+
+        val source = dao.getAccount(fromAccountId, workspaceId)
+            ?: throw IllegalArgumentException("Akun sumber tidak ditemukan pada workspace ini.")
+        if (type == "TRANSFER") {
+            require(toAccountId != null && toAccountId != source.id) { "Transfer harus memiliki akun tujuan yang berbeda." }
+            dao.getAccount(toAccountId, workspaceId)
+                ?: throw IllegalArgumentException("Akun tujuan tidak ditemukan pada workspace ini.")
+            require(categoryId == null) { "Transfer tidak memakai kategori." }
+        } else {
+            require(toAccountId == null) { "Akun tujuan hanya digunakan untuk transfer." }
+            if (categoryId != null) require(dao.getCategoryKind(categoryId, workspaceId) == type) {
+                "Kategori tidak sesuai dengan jenis transaksi."
+            }
+        }
+
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val id = dao.insertRecurringTemplate(
+                RecurringTemplateEntity(
+                    workspaceId = workspaceId, type = type, title = cleanTitle, amountMinor = amount,
+                    fromAccountId = source.id, toAccountId = toAccountId, categoryId = categoryId,
+                    note = note.trim(), cadence = cadence, intervalCount = intervalCount,
+                    nextDueAt = firstDueAt, anchorDayOfMonth = RecurringSchedulePolicy.anchorDay(firstDueAt),
+                    preserveMonthEnd = RecurringSchedulePolicy.isMonthEnd(firstDueAt),
+                    createdAt = now, updatedAt = now
+                )
+            )
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "RECURRING_TEMPLATE", id, "CREATE",
+                "Membuat jadwal transaksi $cleanTitle", now))
+            id
+        }
+    }
+
+    suspend fun recordNextRecurringOccurrence(workspaceId: Long, templateId: Long): Long {
+        val now = System.currentTimeMillis()
+        return database.withTransaction {
+            val template = dao.getRecurringTemplate(templateId, workspaceId)
+                ?: throw IllegalArgumentException("Jadwal transaksi tidak ditemukan pada workspace ini.")
+            require(template.isActive) { "Jadwal sedang dijeda." }
+            require(template.nextDueAt <= now) { "Jadwal belum jatuh tempo." }
+            val source = dao.getAccount(template.fromAccountId, workspaceId)
+                ?: throw IllegalArgumentException("Akun sumber jadwal tidak lagi tersedia.")
+            if (template.type == "TRANSFER") {
+                val targetId = template.toAccountId
+                    ?: throw IllegalArgumentException("Akun tujuan transfer pada jadwal tidak tersedia.")
+                require(targetId != source.id) { "Akun sumber dan tujuan jadwal harus berbeda." }
+                dao.getAccount(targetId, workspaceId)
+                    ?: throw IllegalArgumentException("Akun tujuan jadwal tidak lagi tersedia.")
+            } else if (template.categoryId != null) {
+                require(dao.getCategoryKind(template.categoryId, workspaceId) == template.type) {
+                    "Kategori jadwal tidak lagi sesuai. Buat ulang jadwal dengan kategori aktif."
+                }
+            }
+
+            val nextDue = RecurringSchedulePolicy.nextDueAt(
+                template.nextDueAt, template.cadence, template.intervalCount,
+                template.anchorDayOfMonth, template.preserveMonthEnd
+            )
+            val transactionId = dao.insertTransaction(
+                TransactionEntity(
+                    workspaceId = workspaceId, type = template.type, title = template.title,
+                    amountMinor = template.amountMinor, fromAccountId = source.id,
+                    toAccountId = template.toAccountId, categoryId = template.categoryId,
+                    note = listOf(template.note, "Dicatat dari jadwal #${template.id}")
+                        .filter { it.isNotBlank() }.joinToString("\n").take(500),
+                    occurredAt = template.nextDueAt, createdAt = now
+                )
+            )
+            check(dao.advanceRecurringTemplate(
+                template.id, workspaceId, template.nextDueAt, nextDue, now
+            ) == 1) { "Jadwal berubah saat dicatat. Muat ulang sebelum mencoba lagi." }
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "TRANSACTION", transactionId, "CREATE",
+                "Transaksi dari jadwal berulang ${template.title}", now))
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "RECURRING_TEMPLATE", template.id, "OCCURRENCE",
+                "Mencatat transaksi #$transactionId; jadwal berikutnya $nextDue", now))
+            transactionId
+        }
+    }
+
+    suspend fun setRecurringTemplateActive(workspaceId: Long, templateId: Long, isActive: Boolean) {
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            val existing = dao.getRecurringTemplate(templateId, workspaceId)
+                ?: throw IllegalArgumentException("Jadwal transaksi tidak ditemukan pada workspace ini.")
+            if (existing.isActive == isActive) return@withTransaction
+            require(dao.setRecurringTemplateActive(templateId, workspaceId, isActive, now) == 1) {
+                "Status jadwal gagal diperbarui."
+            }
+            dao.insertAuditLog(AuditLogEntity(workspaceId, "RECURRING_TEMPLATE", templateId,
+                if (isActive) "RESUME" else "PAUSE",
+                if (isActive) "Melanjutkan jadwal ${existing.title}" else "Menjeda jadwal ${existing.title}", now))
         }
     }
 

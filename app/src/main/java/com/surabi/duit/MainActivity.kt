@@ -222,6 +222,7 @@ private fun DuitApp(
     var showAssetDialog by remember { mutableStateOf(false) }
     var showLiabilityDialog by remember { mutableStateOf(false) }
     var showReceivableDialog by remember { mutableStateOf(false) }
+    var showRecurringTemplatesDialog by remember { mutableStateOf(false) }
     var selectedGoalMovement by remember { mutableStateOf<Pair<GoalOverviewRow, Boolean>?>(null) }
     var selectedLiabilityPayment by remember { mutableStateOf<LiabilityOverviewRow?>(null) }
     var selectedReceivableCollection by remember { mutableStateOf<ReceivableOverviewRow?>(null) }
@@ -256,6 +257,7 @@ private fun DuitApp(
     val assets by remember(workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
     val liabilities by remember(workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
     val receivables by remember(workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
+    val recurringTemplates by remember(workspaceId) { repository.recurringTemplates(workspaceId) }.collectAsState(initial = emptyList())
 
     val dashboardRange = remember(dashboardPeriod) { DashboardPeriodResolver.bounds(dashboardPeriod) }
     val income by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
@@ -309,6 +311,11 @@ private fun DuitApp(
                         text = { Text("Catat transaksi") },
                         leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
                         onClick = { showQuickActions = false; showTransactionDialog = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Jadwal transaksi berulang") },
+                        leadingIcon = { Text("↻", fontWeight = FontWeight.Bold) },
+                        onClick = { showQuickActions = false; showRecurringTemplatesDialog = true }
                     )
                     DropdownMenuItem(
                         text = { Text("Tambah akun") },
@@ -399,6 +406,7 @@ private fun DuitApp(
                     accounts = accounts,
                     categories = categories,
                     onAdd = { showTransactionDialog = true },
+                    onManageRecurring = { showRecurringTemplatesDialog = true },
                     onExport = { request ->
                         pendingCsvRequest = request
                         val fileStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
@@ -470,6 +478,43 @@ private fun DuitApp(
                         showTransactionDialog = false
                         snackbar.showSnackbar("Transaksi berhasil disimpan.")
                     }.onFailure { snackbar.showSnackbar(it.message ?: "Transaksi gagal disimpan.") }
+                }
+            }
+        )
+    }
+
+    if (showRecurringTemplatesDialog) {
+        RecurringTemplateManagerDialog(
+            templates = recurringTemplates,
+            accounts = accounts,
+            categories = categories,
+            onDismiss = { showRecurringTemplatesDialog = false },
+            onCreate = { type, amount, title, fromId, toId, categoryId, note, cadence, interval, firstDue ->
+                scope.launch {
+                    runCatching {
+                        repository.createRecurringTemplate(
+                            workspaceId, type, amount, title, fromId, toId, categoryId,
+                            note, cadence, interval, firstDue
+                        )
+                    }.onSuccess {
+                        snackbar.showSnackbar("Jadwal transaksi berhasil dibuat.")
+                    }.onFailure {
+                        snackbar.showSnackbar(it.message ?: "Jadwal transaksi gagal dibuat.")
+                    }
+                }
+            },
+            onRecord = { templateId ->
+                scope.launch {
+                    runCatching { repository.recordNextRecurringOccurrence(workspaceId, templateId) }
+                        .onSuccess { snackbar.showSnackbar("Transaksi jatuh tempo dicatat dan saldo diperbarui.") }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Transaksi terjadwal gagal dicatat.") }
+                }
+            },
+            onToggleActive = { templateId, active ->
+                scope.launch {
+                    runCatching { repository.setRecurringTemplateActive(workspaceId, templateId, active) }
+                        .onSuccess { snackbar.showSnackbar(if (active) "Jadwal dilanjutkan." else "Jadwal dijeda.") }
+                        .onFailure { snackbar.showSnackbar(it.message ?: "Status jadwal gagal diubah.") }
                 }
             }
         )
@@ -752,6 +797,7 @@ private fun TransactionsScreen(
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
     onAdd: () -> Unit,
+    onManageRecurring: () -> Unit,
     onExport: (TransactionExportRequest) -> Unit,
     onVoid: (Long, String) -> Unit
 ) {
@@ -855,6 +901,9 @@ private fun TransactionsScreen(
                 Spacer(Modifier.width(4.dp))
                 Text("Tambah transaksi")
             }
+        }
+        TextButton(onClick = onManageRecurring, modifier = Modifier.fillMaxWidth()) {
+            Text("↻  Kelola transaksi berulang dan jadwal jatuh tempo")
         }
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(

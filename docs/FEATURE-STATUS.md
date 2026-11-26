@@ -1,6 +1,14 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 4.
+Versi source saat ini: **1.3.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+
+## Pembaruan versi 1.3.0 — jadwal transaksi berulang
+
+- Template transaksi berulang tersimpan per workspace untuk pemasukan, pengeluaran, dan transfer; mencakup nominal, akun sumber/tujuan, kategori, catatan, cadence harian/mingguan/bulanan/tahunan, interval 1–36, dan tanggal jatuh tempo pertama.
+- Jadwal dapat dijeda/dilanjutkan. Pencatatan occurrence adalah tindakan eksplisit pengguna: repository membuat transaksi aktual dan memajukan due date secara atomik.
+- Validasi akun/kategori diulang saat pencatatan. Compare-and-set mencegah occurrence yang sama dicatat dua kali akibat ketukan cepat. Audit log mencatat pembuatan template, pause/resume, dan setiap occurrence.
+- Perhitungan kalender mempertahankan tanggal acuan serta akhir bulan (31 Jan → akhir Feb → 31 Mar) dan menangani tahun kabisat.
+- Room v4→v5 menambah `recurring_templates`, foreign key, dan indeks tanpa destructive migration atau perubahan pada histori transaksi lama.
 
 ## Pembaruan versi 1.1.0 — histori, ekspor, privasi, dan dashboard
 
@@ -129,7 +137,7 @@ Versi source saat ini: **1.1.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Edit/hapus piutang, pembagian satu piutang ke beberapa invoice, riwayat perubahan rinci, dan pengingat jatuh tempo piutang.
 - Edit transaksi umum, riwayat versi detail, dan reversal jurnal double-entry.
 - Rekonsiliasi rekening dan penyesuaian saldo formal.
-- Lampiran struk/dokumen, transaksi berulang/terjadwal/massal, template, dan impor CSV/spreadsheet.
+- Template dan jadwal transaksi berulang untuk pemasukan/pengeluaran/transfer tersedia sejak 1.3.0. Lampiran dokumen, posting otomatis background, transaksi massal, dan impor CSV/spreadsheet masih belum tersedia.
 - Ekspor PDF/Excel/DOCX dan laporan profesional.
 - Target dengan jadwal kontribusi otomatis dan notifikasi pengingat.
 - Penyusutan, jadwal pemeliharaan, penjualan/penghapusan aset melalui jurnal.
