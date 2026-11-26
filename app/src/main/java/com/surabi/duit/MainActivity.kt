@@ -110,6 +110,7 @@ import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
 import com.surabi.duit.data.FinanceDatabase
 import com.surabi.duit.data.FinanceBackupManager
+import com.surabi.duit.data.NetWorthCalculator
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.Restore
 import android.net.Uri
@@ -203,10 +204,10 @@ private fun DuitApp(
             backupBusy = true
             val result = withContext(Dispatchers.IO) { runCatching {
                 val out = context.contentResolver.openOutputStream(uri) ?: error("File tujuan tidak dapat dibuka.")
-                FinanceBackupManager.createBackup(context, FinanceDatabase.getInstance(context), out)
+                out.use { FinanceBackupManager.createBackup(context, FinanceDatabase.getInstance(context), it) }
             } }
             backupBusy = false
-            result.onSuccess { snackbar.showSnackbar("Backup berhasil dibuat dan checksum SHA-256 valid.") }
+            result.onSuccess { snackbar.showSnackbar("Backup berhasil dibuat. Checksum SHA-256 disimpan di dalam manifest.") }
                 .onFailure { snackbar.showSnackbar(it.message ?: "Backup gagal.") }
         }
     }
@@ -303,11 +304,13 @@ private fun DuitApp(
     val trendPoints = remember(monthlyCashflow) {
         com.surabi.duit.data.DashboardTrendResolver.points(monthlyCashflow)
     }
-    val netWorth = accounts.sumOf { it.balanceMinor } +
-        goals.sumOf { it.savedMinor } +
-        assets.sumOf { it.currentValueMinor } +
-        receivables.sumOf { it.outstandingMinor } -
-        liabilities.sumOf { it.outstandingMinor }
+    val netWorth = NetWorthCalculator.calculate(
+        accountBalances = accounts.map { it.balanceMinor },
+        allocatedGoalFunds = goals.map { it.savedMinor },
+        nonCashAssets = assets.map { it.currentValueMinor },
+        receivables = receivables.map { it.outstandingMinor },
+        liabilities = liabilities.map { it.outstandingMinor }
+    )
 
     Scaffold(
         topBar = {
