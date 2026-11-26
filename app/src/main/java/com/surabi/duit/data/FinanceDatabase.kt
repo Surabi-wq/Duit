@@ -176,6 +176,42 @@ data class BudgetEntity(
     val createdAt: Long
 )
 
+@Entity(
+    tableName = "recurring_templates",
+    foreignKeys = [
+        ForeignKey(entity = WorkspaceEntity::class, parentColumns = ["id"], childColumns = ["workspaceId"], onDelete = ForeignKey.CASCADE),
+        ForeignKey(entity = AccountEntity::class, parentColumns = ["id"], childColumns = ["fromAccountId"], onDelete = ForeignKey.RESTRICT),
+        ForeignKey(entity = AccountEntity::class, parentColumns = ["id"], childColumns = ["toAccountId"], onDelete = ForeignKey.SET_NULL),
+        ForeignKey(entity = CategoryEntity::class, parentColumns = ["id"], childColumns = ["categoryId"], onDelete = ForeignKey.SET_NULL)
+    ],
+    indices = [
+        Index("workspaceId"),
+        Index("fromAccountId"),
+        Index("toAccountId"),
+        Index("categoryId"),
+        Index(value = ["workspaceId", "isActive", "nextDueAt"])
+    ]
+)
+data class RecurringTemplateEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val workspaceId: Long,
+    val type: String,
+    val title: String,
+    val amountMinor: Long,
+    val fromAccountId: Long,
+    val toAccountId: Long? = null,
+    val categoryId: Long? = null,
+    val note: String = "",
+    val cadence: String,
+    val intervalCount: Int,
+    val nextDueAt: Long,
+    val anchorDayOfMonth: Int,
+    val preserveMonthEnd: Boolean,
+    val isActive: Boolean = true,
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
 data class MonthlyCashflowRow(
     val monthKey: String,
     val incomeMinor: Long,
@@ -389,6 +425,32 @@ interface FinanceDao {
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTransaction(transaction: TransactionEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertRecurringTemplate(template: RecurringTemplateEntity): Long
+
+    @Query("SELECT * FROM recurring_templates WHERE workspaceId = :workspaceId ORDER BY isActive DESC, nextDueAt ASC, id DESC")
+    fun observeRecurringTemplates(workspaceId: Long): Flow<List<RecurringTemplateEntity>>
+
+    @Query("SELECT * FROM recurring_templates WHERE id = :templateId AND workspaceId = :workspaceId LIMIT 1")
+    suspend fun getRecurringTemplate(templateId: Long, workspaceId: Long): RecurringTemplateEntity?
+
+    @Query("""
+        UPDATE recurring_templates
+        SET nextDueAt = :nextDueAt, updatedAt = :updatedAt
+        WHERE id = :templateId AND workspaceId = :workspaceId
+          AND nextDueAt = :expectedDueAt AND isActive = 1
+    """)
+    suspend fun advanceRecurringTemplate(
+        templateId: Long,
+        workspaceId: Long,
+        expectedDueAt: Long,
+        nextDueAt: Long,
+        updatedAt: Long
+    ): Int
+
+    @Query("UPDATE recurring_templates SET isActive = :isActive, updatedAt = :updatedAt WHERE id = :templateId AND workspaceId = :workspaceId")
+    suspend fun setRecurringTemplateActive(templateId: Long, workspaceId: Long, isActive: Boolean, updatedAt: Long): Int
 
     @Query("""
         SELECT * FROM transactions
@@ -722,9 +784,10 @@ interface FinanceDao {
         AssetEntity::class,
         LiabilityEntity::class,
         ReceivableEntity::class,
-        AuditLogEntity::class
+        AuditLogEntity::class,
+        RecurringTemplateEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -831,6 +894,41 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS recurring_templates (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        workspaceId INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        amountMinor INTEGER NOT NULL,
+                        fromAccountId INTEGER NOT NULL,
+                        toAccountId INTEGER,
+                        categoryId INTEGER,
+                        note TEXT NOT NULL,
+                        cadence TEXT NOT NULL,
+                        intervalCount INTEGER NOT NULL,
+                        nextDueAt INTEGER NOT NULL,
+                        anchorDayOfMonth INTEGER NOT NULL,
+                        preserveMonthEnd INTEGER NOT NULL,
+                        isActive INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        FOREIGN KEY(workspaceId) REFERENCES workspaces(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(fromAccountId) REFERENCES accounts(id) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(toAccountId) REFERENCES accounts(id) ON UPDATE NO ACTION ON DELETE SET NULL,
+                        FOREIGN KEY(categoryId) REFERENCES categories(id) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_templates_workspaceId ON recurring_templates(workspaceId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_templates_fromAccountId ON recurring_templates(fromAccountId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_templates_toAccountId ON recurring_templates(toAccountId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_templates_categoryId ON recurring_templates(categoryId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_recurring_templates_workspaceId_isActive_nextDueAt ON recurring_templates(workspaceId, isActive, nextDueAt)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: FinanceDatabase? = null
 
@@ -840,7 +938,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "duit-local.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { INSTANCE = it }
             }
         }
     }
