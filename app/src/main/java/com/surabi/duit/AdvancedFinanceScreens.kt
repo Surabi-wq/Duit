@@ -322,6 +322,12 @@ fun WealthScreen(
     onUpdateAsset: (AssetEntity) -> Unit
 ) {
     var section by remember { mutableStateOf("ACCOUNTS") }
+    // These subtotals feed the visible metric cards; the net-worth formula remains centralized below.
+    val accountTotal = accounts.sumOf { it.balanceMinor }
+    val goalTotal = goals.sumOf { it.savedMinor }
+    val assetTotal = assets.sumOf { it.currentValueMinor }
+    val receivableTotal = receivables.sumOf { it.outstandingMinor }
+    val debtTotal = liabilities.sumOf { it.outstandingMinor }
     val netWorth = NetWorthCalculator.calculate(
         accountBalances = accounts.map { it.balanceMinor },
         allocatedGoalFunds = goals.map { it.savedMinor },
