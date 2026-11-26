@@ -585,13 +585,14 @@ private fun DuitApp(
                                 }
                             }
                             backupBusy = false
+                            // Restore may have closed Room even when rollback succeeds; always rebind UI.
+                            onDatabaseReplaced()
+                            initializationAttempt++
                             result.onSuccess {
-                                onDatabaseReplaced()
-                                initializationAttempt++
                                 showBackupDialog = false
                                 snackbar.showSnackbar("Restore berhasil; database dan integritas SQLite telah diverifikasi.")
                             }.onFailure {
-                                snackbar.showSnackbar(it.message ?: "Restore gagal; database aktif tidak diubah.")
+                                snackbar.showSnackbar(it.message ?: "Restore gagal; periksa status pemulihan database.")
                             }
                         }
                     }
