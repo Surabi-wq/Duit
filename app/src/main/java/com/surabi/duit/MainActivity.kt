@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -726,6 +727,24 @@ private fun DashboardPeriodPicker(
 }
 
 @Composable
+private fun TransactionFilterTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    numeric: Boolean = false
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+        singleLine = true,
+        modifier = modifier
+    )
+}
+
+@Composable
 private fun TransactionsScreen(
     workspaceId: Long,
     repository: FinanceRepository,
@@ -797,7 +816,9 @@ private fun TransactionsScreen(
     val appendError = pagingTransactions.loadState.append as? LoadState.Error
     val isInitialLoading = pagingTransactions.loadState.refresh is LoadState.Loading && pagingTransactions.itemCount == 0
 
-    Column(Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).padding(horizontal = 16.dp, vertical = 14.dp)) {
+    DuitResponsiveColumn(
+        modifier = Modifier.background(Color(0xFFF3F7F4)).padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text("RIWAYAT AKTIVITAS", style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.1.sp)
@@ -885,39 +906,55 @@ private fun TransactionsScreen(
                     Modifier.fillMaxWidth().heightIn(max = 290.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = startDateText,
-                            onValueChange = { startDateText = it.take(10) },
-                            label = { Text("Dari (dd-MM-yyyy)") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = endDateText,
-                            onValueChange = { endDateText = it.take(10) },
-                            label = { Text("Sampai (dd-MM-yyyy)") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        if (maxWidth < 430.dp) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TransactionFilterTextField(
+                                    startDateText, { startDateText = it.take(10) },
+                                    "Dari (dd-MM-yyyy)", Modifier.fillMaxWidth()
+                                )
+                                TransactionFilterTextField(
+                                    endDateText, { endDateText = it.take(10) },
+                                    "Sampai (dd-MM-yyyy)", Modifier.fillMaxWidth()
+                                )
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                TransactionFilterTextField(
+                                    startDateText, { startDateText = it.take(10) },
+                                    "Dari (dd-MM-yyyy)", Modifier.weight(1f)
+                                )
+                                TransactionFilterTextField(
+                                    endDateText, { endDateText = it.take(10) },
+                                    "Sampai (dd-MM-yyyy)", Modifier.weight(1f)
+                                )
+                            }
+                        }
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = minAmountText,
-                            onValueChange = { minAmountText = it.filter(Char::isDigit) },
-                            label = { Text("Nominal minimum") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = maxAmountText,
-                            onValueChange = { maxAmountText = it.filter(Char::isDigit) },
-                            label = { Text("Nominal maksimum") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                    BoxWithConstraints(Modifier.fillMaxWidth()) {
+                        if (maxWidth < 430.dp) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TransactionFilterTextField(
+                                    minAmountText, { minAmountText = it.filter(Char::isDigit) },
+                                    "Nominal minimum", Modifier.fillMaxWidth(), numeric = true
+                                )
+                                TransactionFilterTextField(
+                                    maxAmountText, { maxAmountText = it.filter(Char::isDigit) },
+                                    "Nominal maksimum", Modifier.fillMaxWidth(), numeric = true
+                                )
+                            }
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                TransactionFilterTextField(
+                                    minAmountText, { minAmountText = it.filter(Char::isDigit) },
+                                    "Nominal minimum", Modifier.weight(1f), numeric = true
+                                )
+                                TransactionFilterTextField(
+                                    maxAmountText, { maxAmountText = it.filter(Char::isDigit) },
+                                    "Nominal maksimum", Modifier.weight(1f), numeric = true
+                                )
+                            }
+                        }
                     }
                     IdDropdown(
                         label = "Akun",
@@ -1379,7 +1416,28 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
                 AppTab.DASHBOARD, "Buka Ringkasan"),
             GuideEntry("Keamanan", "Penyimpanan offline dan cadangan",
                 "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV dapat menulis seluruh transaksi yang cocok, tetapi bukan pengganti backup database.",
-                AppTab.GUIDE, "Tetap di Panduan")
+                AppTab.GUIDE, "Tetap di Panduan"),
+            GuideEntry("Tutorial", "Langkah pertama mencatat transaksi",
+                "1) Pilih Tambah. 2) Tentukan pemasukan, pengeluaran, atau transfer. 3) Isi nominal, akun, kategori, tanggal, dan keterangan. 4) Tinjau kembali lalu simpan. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.",
+                AppTab.TRANSACTIONS, "Mulai mencatat"),
+            GuideEntry("Istilah", "Saldo awal",
+                "Saldo awal adalah nilai akun sebelum transaksi yang dicatat di aplikasi. Saldo setelahnya dihitung dari transaksi masuk, keluar, dan transfer yang tersimpan.",
+                AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Istilah", "Arus kas",
+                "Arus kas membandingkan pemasukan dengan pengeluaran dalam periode yang dipilih. Transfer antar-akun dan perpindahan dana target tidak dihitung sebagai pendapatan atau biaya.",
+                AppTab.DASHBOARD, "Buka Ringkas"),
+            GuideEntry("Istilah", "Kekayaan bersih",
+                "Kekayaan bersih terdata dihitung dari saldo akun, dana target, aset non-tunai, dan piutang, dikurangi sisa utang. Jangan mencatat saldo rekening lagi sebagai aset non-tunai.",
+                AppTab.ACCOUNTS, "Buka Aset"),
+            GuideEntry("Istilah", "Realisasi anggaran",
+                "Realisasi adalah transaksi pengeluaran yang cocok dengan anggaran pada periode terkait. Sisa anggaran adalah batas dikurangi realisasi; nilai negatif berarti batas terlampaui.",
+                AppTab.BUDGETS, "Buka Rencana"),
+            GuideEntry("Istilah", "Dana target",
+                "Dana target berasal dari transaksi setoran dan penarikan yang terkait. Setoran mengurangi saldo akun dan menambah dana target; karena itu bukan biaya.",
+                AppTab.BUDGETS, "Buka Rencana"),
+            GuideEntry("Istilah", "Piutang dan utang",
+                "Piutang adalah tagihan yang belum diterima, sedangkan utang adalah kewajiban yang belum dibayar. Saldo akun baru berubah ketika penerimaan atau pembayaran benar-benar dicatat.",
+                AppTab.ACCOUNTS, "Buka Aset")
         )
     }
     val filtered = remember(query, entries) {
@@ -1391,8 +1449,8 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
+    DuitResponsiveColumn(
+        modifier = Modifier.background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
             .padding(horizontal = 17.dp, vertical = 17.dp),
         verticalArrangement = Arrangement.spacedBy(15.dp)
     ) {
@@ -1468,6 +1526,18 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
             "Belum. Akuntansi double-entry, buku besar, rekonsiliasi, impor spreadsheet, ERP, inventaris, OCR, enkripsi database, multi-user, dan backup/restore masih menjadi pekerjaan lanjutan."
+        )
+        GuideCard(
+            "Mengapa transaksi dibatalkan, bukan dihapus?",
+            "Pembatalan menyimpan alasan pada audit trail dan mengecualikan transaksi dari saldo serta laporan. Cara ini menjaga jejak perubahan dan mengurangi risiko hilangnya riwayat."
+        )
+        GuideCard(
+            "Apakah menyembunyikan nominal mengenkripsi database?",
+            "Tidak. Penyembunyian nominal hanya mengubah tampilan di layar. Perlindungan dengan PIN/biometrik dan enkripsi database masih memerlukan implementasi terpisah."
+        )
+        GuideCard(
+            "Bagaimana agar transfer tidak dihitung dua kali?",
+            "Gunakan jenis Transfer dan pilih akun sumber serta tujuan yang benar. Sistem mengurangi saldo sumber dan menambah saldo tujuan tanpa mencatat pemasukan atau pengeluaran."
         )
         Spacer(Modifier.height(24.dp))
     }

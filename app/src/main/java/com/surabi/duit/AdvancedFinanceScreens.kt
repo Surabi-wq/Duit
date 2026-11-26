@@ -79,8 +79,8 @@ fun PlanningScreen(
     val spentTotal = budgets.sumOf { it.spentMinor }
     val remainingBudget = budgetTotal - spentTotal
 
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
+    DuitResponsiveColumn(
+        modifier = Modifier.background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
             .padding(horizontal = 17.dp, vertical = 17.dp),
         verticalArrangement = Arrangement.spacedBy(17.dp)
     ) {
@@ -324,8 +324,8 @@ fun WealthScreen(
     val debtTotal = liabilities.sumOf { it.outstandingMinor }
     val netWorth = accountTotal + goalTotal + assetTotal + receivableTotal - debtTotal
 
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
+    DuitResponsiveColumn(
+        modifier = Modifier.background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
             .padding(horizontal = 17.dp, vertical = 17.dp),
         verticalArrangement = Arrangement.spacedBy(15.dp)
     ) {
