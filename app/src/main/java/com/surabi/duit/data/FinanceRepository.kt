@@ -394,7 +394,7 @@ class FinanceRepository(private val database: FinanceDatabase) {
                     toAccountId = template.toAccountId, categoryId = template.categoryId,
                     note = listOf(template.note, "Dicatat dari jadwal #${template.id}")
                         .filter { it.isNotBlank() }.joinToString("\n").take(500),
-                    occurredAt = now, createdAt = now
+                    occurredAt = template.nextDueAt, createdAt = now
                 )
             )
             check(dao.advanceRecurringTemplate(
