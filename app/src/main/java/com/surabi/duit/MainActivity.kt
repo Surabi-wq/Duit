@@ -1,5 +1,7 @@
 package com.surabi.duit
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.ComponentActivity
@@ -108,6 +110,7 @@ import com.surabi.duit.data.MinimumBalanceParser
 import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
+import com.surabi.duit.data.FinanceBackupManager
 import com.surabi.duit.data.FinanceDatabase
 import com.surabi.duit.data.FinanceAlertEngine
 import com.surabi.duit.data.FinanceAlertSeverity
@@ -141,7 +144,8 @@ class MainActivity : ComponentActivity() {
         window.navigationBarColor = android.graphics.Color.WHITE
         window.decorView.systemUiVisibility =
             window.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        val repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
+        val database = FinanceDatabase.getInstance(applicationContext)
+        val repository = FinanceRepository(database)
         val displayPreferences = getSharedPreferences("duit-display-preferences", MODE_PRIVATE)
         setContent {
             var balancesVisible by remember {
@@ -151,6 +155,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalDuitBalancesVisible provides balancesVisible) {
                     DuitApp(
                         repository = repository,
+                        database = database,
                         balancesVisible = balancesVisible,
                         onBalancesVisibleChange = { visible ->
                             balancesVisible = visible
@@ -178,6 +183,7 @@ private enum class AppTab(
 @Composable
 private fun DuitApp(
     repository: FinanceRepository,
+    database: FinanceDatabase,
     balancesVisible: Boolean,
     onBalancesVisibleChange: (Boolean) -> Unit
 ) {
@@ -207,6 +213,62 @@ private fun DuitApp(
             }
         }
     }
+    var selectedRestoreUri by remember { mutableStateOf<Uri?>(null) }
+    var restoreSummary by remember { mutableStateOf<FinanceBackupManager.BackupSummary?>(null) }
+    var showRestoreConfirmation by remember { mutableStateOf(false) }
+    var restoreInProgress by remember { mutableStateOf(false) }
+
+    val backupDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val output = context.contentResolver.openOutputStream(uri, "wt")
+                            ?: error("Lokasi penyimpanan backup tidak dapat dibuka.")
+                        val appVersion = context.packageManager
+                            .getPackageInfo(context.packageName, 0).versionName.orEmpty()
+                        output.use { FinanceBackupManager.createBackup(database, it, appVersion) }
+                    }
+                }
+                result.onSuccess { summary ->
+                    snackbar.showSnackbar(
+                        "Backup Duit berhasil dibuat: ${summary.totalRows} baris dari ${summary.tableCount} tabel."
+                    )
+                }.onFailure {
+                    snackbar.showSnackbar(it.message ?: "Backup Duit gagal dibuat.")
+                }
+            }
+        }
+    }
+
+    val restoreDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val input = context.contentResolver.openInputStream(uri)
+                            ?: error("File backup tidak dapat dibuka.")
+                        input.use { FinanceBackupManager.inspectBackup(it) }
+                    }
+                }
+                result.onSuccess { summary ->
+                    selectedRestoreUri = uri
+                    restoreSummary = summary
+                    showRestoreConfirmation = true
+                }.onFailure {
+                    snackbar.showSnackbar(it.message ?: "File backup tidak valid.")
+                }
+            }
+        }
+    }
+
     val workspaces by repository.workspaces.collectAsState(initial = emptyList())
     var selectedWorkspaceId by remember { mutableLongStateOf(0L) }
     var selectedTab by remember { mutableStateOf(AppTab.DASHBOARD) }
@@ -448,10 +510,86 @@ private fun DuitApp(
                     onPayLiability = { selectedLiabilityPayment = it },
                     onUpdateAsset = { selectedAssetForValue = it }
                 )
-                AppTab.GUIDE -> GuideScreen(onNavigate = { selectedTab = it })
+                AppTab.GUIDE -> GuideScreen(
+                    onNavigate = { selectedTab = it },
+                    onCreateBackup = {
+                        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                        backupDocumentLauncher.launch("Duit-Backup-$stamp.duitbackup")
+                    },
+                    onRestoreBackup = { restoreDocumentLauncher.launch(arrayOf("*/*")) }
+                )
                 }
             }
         }
+    }
+
+    if (showRestoreConfirmation && restoreSummary != null) {
+        val summary = restoreSummary!!
+        AlertDialog(
+            onDismissRequest = { if (!restoreInProgress) showRestoreConfirmation = false },
+            title = { Text("Pulihkan backup Duit?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("File backup berhasil dibaca.")
+                    Text("Versi aplikasi pembuat: ${summary.appVersion}")
+                    Text("Tanggal backup: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID")).format(Date(summary.createdAt))}")
+                    Text("Isi backup: ${summary.tableCount} tabel dan ${NumberFormat.getIntegerInstance(Locale("id", "ID")).format(summary.totalRows)} baris data.")
+                    Text(
+                        "PERINGATAN: seluruh data Duit yang saat ini tersimpan di perangkat akan diganti dengan isi backup. Tindakan ini tidak dapat dibatalkan dari aplikasi.",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        "Jangan menutup aplikasi selama proses pemulihan berlangsung. Struktur backup harus kompatibel dengan versi database aplikasi ini.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (restoreInProgress) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        Text("Memulihkan database…", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !restoreInProgress && selectedRestoreUri != null,
+                    onClick = {
+                        val uri = selectedRestoreUri ?: return@TextButton
+                        restoreInProgress = true
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val input = context.contentResolver.openInputStream(uri)
+                                        ?: error("File backup tidak dapat dibuka.")
+                                    input.use { FinanceBackupManager.restoreBackup(database, it) }
+                                }
+                            }
+                            restoreInProgress = false
+                            result.onSuccess { restored ->
+                                showRestoreConfirmation = false
+                                selectedRestoreUri = null
+                                restoreSummary = null
+                                snackbar.showSnackbar(
+                                    "Pemulihan selesai: ${restored.totalRows} baris dari ${restored.tableCount} tabel berhasil dipulihkan."
+                                )
+                            }.onFailure {
+                                snackbar.showSnackbar(it.message ?: "Pemulihan gagal. Data lama dipertahankan.")
+                            }
+                        }
+                    }
+                ) { Text("Ganti data dan pulihkan") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !restoreInProgress,
+                    onClick = {
+                        showRestoreConfirmation = false
+                        selectedRestoreUri = null
+                        restoreSummary = null
+                    }
+                ) { Text("Batal") }
+            }
+        )
     }
 
     if (showWorkspaceDialog) {
@@ -1454,7 +1592,11 @@ private data class GuideEntry(
 )
 
 @Composable
-private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
+private fun GuideScreen(
+    onNavigate: (AppTab) -> Unit,
+    onCreateBackup: () -> Unit,
+    onRestoreBackup: () -> Unit
+) {
     var query by remember { mutableStateOf("") }
     val entries = remember {
         listOf(
@@ -1492,8 +1634,8 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
                 "Gunakan ikon pengaturan pada header dashboard untuk menampilkan atau menyembunyikan tren arus kas, rekening, rencana, peringatan, jatuh tempo, dan aktivitas terbaru.",
                 AppTab.DASHBOARD, "Buka Ringkasan"),
             GuideEntry("Keamanan", "Penyimpanan offline dan cadangan",
-                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV dapat menulis seluruh transaksi yang cocok, tetapi bukan pengganti backup database.",
-                AppTab.GUIDE, "Tetap di Panduan"),
+                "Data inti disimpan lokal dengan Room/SQLite. Buat file .duitbackup untuk mencadangkan seluruh tabel data, lalu gunakan Pulihkan dari file backup pada bagian ini. Restore mengganti seluruh data lokal dan memerlukan skema database yang kompatibel.",
+                AppTab.GUIDE, "Kelola backup"),
             GuideEntry("Tutorial", "Langkah pertama mencatat transaksi",
                 "1) Pilih Tambah. 2) Tentukan pemasukan, pengeluaran, atau transfer. 3) Isi nominal, akun, kategori, tanggal, dan keterangan. 4) Tinjau kembali lalu simpan. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.",
                 AppTab.TRANSACTIONS, "Mulai mencatat"),
@@ -1540,6 +1682,23 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
             value = "Temukan cara menggunakan setiap fitur",
             supporting = "Panduan, istilah, dan jawaban berdasarkan kemampuan aplikasi saat ini"
         )
+        DuitSectionHeader("Backup dan pemulihan data")
+        DuitPanel {
+            Text("Cadangkan seluruh database Duit, bukan hanya transaksi. File .duitbackup mencakup workspace, akun, kategori, transaksi, anggaran, target, aset, kewajiban, audit log, dan jadwal berulang.")
+            FilledTonalButton(
+                onClick = onCreateBackup,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Buat backup lengkap") }
+            OutlinedButton(
+                onClick = onRestoreBackup,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("Pulihkan dari file backup") }
+            Text(
+                "Restore akan mengganti seluruh data lokal setelah Anda memeriksa ringkasan file dan memberi konfirmasi. Simpan backup di lokasi aman.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         OutlinedTextField(
             value = query,
             onValueChange = { query = it.take(100) },
@@ -1597,8 +1756,12 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
             "Saldo akun juga dipengaruhi saldo awal, transfer, setoran/penarikan target, pencairan pinjaman, pembayaran utang, dan penerimaan piutang. Beberapa aliran tersebut bukan pendapatan atau biaya."
         )
         GuideCard(
-            "Apakah ekspor CSV mencadangkan seluruh aplikasi?",
-            "Tidak. CSV menulis seluruh hasil transaksi yang cocok dengan filter aktif secara bertahap. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
+            "Apa perbedaan CSV dan backup Duit?",
+            "CSV hanya mengekspor baris transaksi sesuai filter. File .duitbackup mencadangkan seluruh tabel database, termasuk workspace, akun, kategori, anggaran, target, aset, utang, piutang, audit log, dan jadwal berulang."
+        )
+        GuideCard(
+            "Apakah restore menggabungkan data lama dan baru?",
+            "Tidak. Restore mengganti seluruh isi database lokal dengan isi file backup. Periksa jumlah tabel dan baris data, pastikan file benar, lalu konfirmasi. Jika format atau skema tidak cocok, pemulihan ditolak dan transaksi database dibatalkan."
         )
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
