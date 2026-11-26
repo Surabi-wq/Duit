@@ -32,7 +32,7 @@ object FinanceBackupManager {
 
     fun restoreBackup(context: Context, database: FinanceDatabase, source: InputStream) {
         val stage = File(context.cacheDir, "duit-restore-${System.nanoTime()}.db")
-        val safety = File(context.cacheDir, "duit-safety-${System.nanoTime()}.db")
+        val safety = File(context.noBackupFilesDir, "duit-safety-${System.nanoTime()}.db")
         val target = context.getDatabasePath(DB)
         var safetyPrepared = false
         var restoreCommitted = false
