@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **1.4.0**
+- Versi: **1.4.1**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -20,6 +20,15 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Form duplikasi memuat nominal, keterangan, catatan, akun sumber/tujuan, dan kategori yang masih valid pada workspace aktif.
 - Salinan disimpan sebagai transaksi baru melalui validasi dan audit trail yang sama seperti pencatatan biasa; tanggalnya menggunakan waktu saat disimpan.
 - Transaksi sumber tidak diedit, dihapus, atau ditimpa. Tidak ada perubahan skema Room maupun perhitungan saldo.
+
+## Perbaikan versi 1.4.1 — backup/restore dan konsistensi UI keuangan
+
+- Tindakan **Backup & restore database** tersedia dari menu Tambah. Backup membuat arsip ZIP lokal yang berisi database Room dan manifest format/ukuran/checksum SHA-256 melalui Android Storage Access Framework.
+- Restore memeriksa entri ZIP, manifest, ukuran file, checksum, integritas SQLite, foreign key, dan versi skema. Database aktif dibuatkan salinan pengaman sebelum penggantian; jika restore gagal, aplikasi mencoba memulihkan salinan tersebut.
+- Setelah restore sukses, repository dan kolektor Flow UI diganti ke instance Room yang baru. Halaman tidak lagi mempertahankan Flow dari instance database yang sudah ditutup.
+- Dashboard dan halaman Aset memakai satu kalkulator kekayaan bersih. Definisi tetap saldo akun + dana target teralokasi + aset non-tunai + piutang − kewajiban. Ditambahkan pengujian unit untuk dana target, kewajiban, dan input kosong.
+- Progres target menghindari pembagian nol untuk target dengan nilai tidak valid. Tidak ada perubahan pada skema Room, transaksi, atau rumus saldo.
+- Pusat bantuan menjelaskan backup, restore, dan batasan keamanan yang berlaku.
 
 ## Fitur baru versi 1.3.0 — jadwal transaksi berulang
 
@@ -131,7 +140,7 @@ Catatan cakupan: histori transaksi dan ekspor CSV sekarang memakai pemuatan/penu
 ## Fitur yang belum tersedia sebagai fungsi lengkap
 
 Fitur berikut masih menjadi backlog dan tidak boleh dianggap aktif hanya karena ada istilah, komponen, atau rancangan antarmukanya:
-- Rekonsiliasi rekening, penyesuaian saldo formal, edit transaksi umum, transaksi berulang/terjadwal/massal, template, lampiran struk, dan pembatalan melalui reversal jurnal double-entry.
+- Rekonsiliasi rekening, penyesuaian saldo formal, edit transaksi umum, pemrosesan transaksi massal, template transaksi umum, lampiran struk, dan pembatalan melalui reversal jurnal double-entry. Jadwal transaksi berulang sudah tersedia untuk pencatatan manual saat jatuh tempo.
 - Impor CSV/spreadsheet; ekspor laporan PDF/Excel/DOCX.
 - Target dengan setoran terjadwal otomatis dan notifikasi.
 - Riwayat nilai aset terstruktur, penyusutan, pemeliharaan, pembelian/penjualan/penghapusan aset yang terhubung ke jurnal.
@@ -141,7 +150,7 @@ Fitur berikut masih menjadi backlog dan tidak boleh dianggap aktif hanya karena 
 - Portofolio investasi lengkap, harga pasar otomatis, dividen, obligasi, dan analisis alokasi.
 - Pajak, invoice/kwitansi profesional, arsip dokumen, serta dokumen administrasi.
 - Grafik lanjutan, perbandingan periode/workspace, analisis prediktif, simulasi, OCR lokal, dan asisten bahasa sehari-hari.
-- Multi-user, role/permission, persetujuan berjenjang, PIN/biometrik, enkripsi database, pengamanan lampiran, dan backup/restore terenkripsi dengan checksum.
+- Multi-user, role/permission, persetujuan berjenjang, PIN/biometrik, enkripsi database, pengamanan lampiran, backup terenkripsi, backup terjadwal dan riwayat backup, backup selektif workspace, serta backup file lampiran.
 - Personalisasi lengkap, tema gelap/sistem, mode pemula/mahir, dan multi-mata uang.
 
 Lihat [docs/FEATURE-STATUS.md](docs/FEATURE-STATUS.md) untuk status yang lebih terperinci dan gerbang penerimaan.
@@ -156,7 +165,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.3.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.4.1.apk**.
 
 ## Signing dan distribusi
 
@@ -164,7 +173,7 @@ Varian Release saat ini menggunakan konfigurasi signing debug untuk pengujian in
 
 ## Database dan kompatibilitas
 
-Database Room versi 4 memiliki migrasi eksplisit dari versi 1 ke 2, versi 2 ke 3, dan versi 3 ke 4. Migrasi 3→4 hanya menambahkan indeks gabungan untuk pencarian/paging transaksi. Jangan gunakan destructive migration pada data pengguna. Perubahan skema berikutnya harus menambahkan migrasi dan pengujian upgrade, bukan menghapus database. Sebelum penggunaan produksi, uji upgrade dari APK versi sebelumnya pada perangkat uji dan siapkan backup/restore tervalidasi. Backup/restore database penuh belum tersedia pada versi 1.1.0.
+Database Room versi 5 memiliki migrasi eksplisit 1→2, 2→3, 3→4, dan 4→5. Migrasi 3→4 menambah indeks gabungan untuk paging transaksi, sedangkan 4→5 menambah tabel dan indeks template transaksi berulang. Pembaruan 1.4.1 tidak mengubah skema. Jangan gunakan destructive migration pada data pengguna; setiap perubahan skema harus disertai migrasi non-destruktif dan pengujian upgrade. Menu Tambah → Backup & restore database membuat ZIP berisi database lokal dan manifest ukuran/SHA-256, memvalidasi integritas SQLite dan kompatibilitas skema sebelum restore, serta membuat salinan pengaman untuk rollback. Backup bekerja offline. Batasan saat ini: arsip belum dienkripsi, belum menyertakan lampiran, belum terjadwal, belum memiliki riwayat di aplikasi, dan belum mendukung backup/restore selektif workspace. SHA-256 adalah pemeriksaan integritas, bukan enkripsi atau autentikasi sumber file. Simpan backup di lokasi tepercaya.
 
 ## Ekspor CSV dan keamanan spreadsheet
 

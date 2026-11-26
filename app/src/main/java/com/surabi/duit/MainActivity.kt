@@ -1,6 +1,7 @@
 package com.surabi.duit
 
 import android.os.Bundle
+import android.net.Uri
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -43,6 +44,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ExpandMore
@@ -109,6 +112,8 @@ import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
 import com.surabi.duit.data.FinanceDatabase
+import com.surabi.duit.data.FinanceBackupManager
+import com.surabi.duit.data.NetWorthCalculator
 import com.surabi.duit.data.FinanceAlertEngine
 import com.surabi.duit.data.FinanceAlertSeverity
 import com.surabi.duit.data.FinanceRepository
@@ -141,9 +146,11 @@ class MainActivity : ComponentActivity() {
         window.navigationBarColor = android.graphics.Color.WHITE
         window.decorView.systemUiVisibility =
             window.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-        val repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
         val displayPreferences = getSharedPreferences("duit-display-preferences", MODE_PRIVATE)
         setContent {
+            var repository by remember {
+                mutableStateOf(FinanceRepository(FinanceDatabase.getInstance(applicationContext)))
+            }
             var balancesVisible by remember {
                 mutableStateOf(displayPreferences.getBoolean("balances_visible", true))
             }
@@ -151,6 +158,9 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalDuitBalancesVisible provides balancesVisible) {
                     DuitApp(
                         repository = repository,
+                        onDatabaseReplaced = {
+                            repository = FinanceRepository(FinanceDatabase.getInstance(applicationContext))
+                        },
                         balancesVisible = balancesVisible,
                         onBalancesVisibleChange = { visible ->
                             balancesVisible = visible
@@ -178,6 +188,7 @@ private enum class AppTab(
 @Composable
 private fun DuitApp(
     repository: FinanceRepository,
+    onDatabaseReplaced: () -> Unit,
     balancesVisible: Boolean,
     onBalancesVisibleChange: (Boolean) -> Unit
 ) {
@@ -185,6 +196,40 @@ private fun DuitApp(
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     var pendingCsvRequest by remember { mutableStateOf<TransactionExportRequest?>(null) }
+    var showBackupDialog by remember { mutableStateOf(false) }
+    var showRestoreConfirmation by remember { mutableStateOf(false) }
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    var backupBusy by remember { mutableStateOf(false) }
+    val backupExportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/zip")
+    ) { uri ->
+        if (uri != null) scope.launch {
+            backupBusy = true
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val output = context.contentResolver.openOutputStream(uri)
+                        ?: error("File tujuan tidak dapat dibuka.")
+                    output.use {
+                        FinanceBackupManager.createBackup(context, FinanceDatabase.getInstance(context), it)
+                    }
+                }
+            }
+            backupBusy = false
+            result.onSuccess {
+                snackbar.showSnackbar("Backup berhasil dibuat. Manifest menyimpan checksum SHA-256.")
+            }.onFailure {
+                snackbar.showSnackbar(it.message ?: "Backup gagal dibuat.")
+            }
+        }
+    }
+    val backupImportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            restoreUri = uri
+            showRestoreConfirmation = true
+        }
+    }
     val csvExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -251,18 +296,18 @@ private fun DuitApp(
 
     val workspaceId = selectedWorkspaceId
     val selectedWorkspace = workspaces.firstOrNull { it.id == workspaceId }
-    val accounts by remember(workspaceId) { repository.accounts(workspaceId) }.collectAsState(initial = emptyList())
-    val categories by remember(workspaceId) { repository.categories(workspaceId) }.collectAsState(initial = emptyList())
-    val transactions by remember(workspaceId) { repository.transactions(workspaceId) }.collectAsState(initial = emptyList())
-    val budgets by remember(workspaceId) { repository.budgets(workspaceId) }.collectAsState(initial = emptyList())
-    val goals by remember(workspaceId) { repository.goals(workspaceId) }.collectAsState(initial = emptyList())
-    val assets by remember(workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
-    val liabilities by remember(workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
-    val receivables by remember(workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
-    val recurringTemplates by remember(workspaceId) { repository.recurringTemplates(workspaceId) }.collectAsState(initial = emptyList())
+    val accounts by remember(repository, workspaceId) { repository.accounts(workspaceId) }.collectAsState(initial = emptyList())
+    val categories by remember(repository, workspaceId) { repository.categories(workspaceId) }.collectAsState(initial = emptyList())
+    val transactions by remember(repository, workspaceId) { repository.transactions(workspaceId) }.collectAsState(initial = emptyList())
+    val budgets by remember(repository, workspaceId) { repository.budgets(workspaceId) }.collectAsState(initial = emptyList())
+    val goals by remember(repository, workspaceId) { repository.goals(workspaceId) }.collectAsState(initial = emptyList())
+    val assets by remember(repository, workspaceId) { repository.assets(workspaceId) }.collectAsState(initial = emptyList())
+    val liabilities by remember(repository, workspaceId) { repository.liabilities(workspaceId) }.collectAsState(initial = emptyList())
+    val receivables by remember(repository, workspaceId) { repository.receivables(workspaceId) }.collectAsState(initial = emptyList())
+    val recurringTemplates by remember(repository, workspaceId) { repository.recurringTemplates(workspaceId) }.collectAsState(initial = emptyList())
 
     val dashboardRange = remember(dashboardPeriod) { DashboardPeriodResolver.bounds(dashboardPeriod) }
-    val income by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
+    val income by remember(repository, workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
         repository.income(workspaceId, dashboardRange.startAt, dashboardRange.endAt)
     }.collectAsState(initial = 0L)
     val expenses by remember(workspaceId, dashboardRange.startAt, dashboardRange.endAt) {
@@ -270,17 +315,19 @@ private fun DuitApp(
     }.collectAsState(initial = 0L)
 
     val trendRange = remember(workspaceId) { com.surabi.duit.data.DashboardTrendResolver.bounds() }
-    val monthlyCashflow by remember(workspaceId, trendRange.startAt, trendRange.endAt) {
+    val monthlyCashflow by remember(repository, workspaceId, trendRange.startAt, trendRange.endAt) {
         repository.monthlyCashflow(workspaceId, trendRange.startAt, trendRange.endAt)
     }.collectAsState(initial = emptyList())
     val trendPoints = remember(monthlyCashflow) {
         com.surabi.duit.data.DashboardTrendResolver.points(monthlyCashflow)
     }
-    val netWorth = accounts.sumOf { it.balanceMinor } +
-        goals.sumOf { it.savedMinor } +
-        assets.sumOf { it.currentValueMinor } +
-        receivables.sumOf { it.outstandingMinor } -
-        liabilities.sumOf { it.outstandingMinor }
+    val netWorth = NetWorthCalculator.calculate(
+        accountBalances = accounts.map { it.balanceMinor },
+        allocatedGoalFunds = goals.map { it.savedMinor },
+        nonCashAssets = assets.map { it.currentValueMinor },
+        receivables = receivables.map { it.outstandingMinor },
+        liabilities = liabilities.map { it.outstandingMinor }
+    )
 
     Scaffold(
         topBar = {
@@ -309,6 +356,11 @@ private fun DuitApp(
                     text = { Text("Tambah") }
                 )
                 DropdownMenu(expanded = showQuickActions, onDismissRequest = { showQuickActions = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Backup & restore database") },
+                        leadingIcon = { Icon(Icons.Filled.Backup, contentDescription = null) },
+                        onClick = { showQuickActions = false; showBackupDialog = true }
+                    )
                     DropdownMenuItem(
                         text = { Text("Catat transaksi") },
                         leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
@@ -452,6 +504,107 @@ private fun DuitApp(
                 }
             }
         }
+    }
+
+    if (showBackupDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!backupBusy) showBackupDialog = false },
+            title = { Text("Backup & restore database") },
+            text = {
+                Column(
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("Backup mencakup seluruh workspace, akun, transaksi, anggaran, target, aset, kewajiban, jadwal transaksi, dan audit log.")
+                    Text("Arsip ZIP memiliki manifest dan checksum SHA-256. Data diproses lokal dan tidak dikirim ke server.")
+                    Text("Backup belum dienkripsi dan belum mencakup file lampiran. Simpan arsip di lokasi tepercaya.")
+                    Text("Restore mengganti database aktif setelah validasi. Salinan database saat ini dibuat lebih dahulu untuk pemulihan jika penggantian gagal.")
+                    if (backupBusy) CircularProgressIndicator()
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(
+                        enabled = !backupBusy,
+                        onClick = {
+                            val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                            backupExportLauncher.launch("Duit-Database-Backup-$stamp.zip")
+                        }
+                    ) {
+                        Icon(Icons.Filled.Backup, contentDescription = null)
+                        Text(" Buat backup")
+                    }
+                    TextButton(
+                        enabled = !backupBusy,
+                        onClick = {
+                            backupImportLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                        }
+                    ) {
+                        Icon(Icons.Filled.Restore, contentDescription = null)
+                        Text(" Pilih file restore")
+                    }
+                    TextButton(enabled = !backupBusy, onClick = { showBackupDialog = false }) {
+                        Text("Tutup")
+                    }
+                }
+            }
+        )
+    }
+    if (showRestoreConfirmation && restoreUri != null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!backupBusy) {
+                    showRestoreConfirmation = false
+                    restoreUri = null
+                }
+            },
+            title = { Text("Pulihkan database?") },
+            text = {
+                Text("Seluruh database lokal aktif akan diganti dengan isi file backup. Pastikan Anda menyimpan backup terbaru dari data saat ini. File akan divalidasi sebelum database diganti.")
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !backupBusy,
+                    onClick = {
+                        val uri = restoreUri
+                        restoreUri = null
+                        showRestoreConfirmation = false
+                        if (uri != null) scope.launch {
+                            backupBusy = true
+                            val result = withContext(Dispatchers.IO) {
+                                runCatching {
+                                    val input = context.contentResolver.openInputStream(uri)
+                                        ?: error("File backup tidak dapat dibuka.")
+                                    input.use {
+                                        FinanceBackupManager.restoreBackup(
+                                            context,
+                                            FinanceDatabase.getInstance(context),
+                                            it
+                                        )
+                                    }
+                                }
+                            }
+                            backupBusy = false
+                            // Restore may have closed Room even when rollback succeeds; always rebind UI.
+                            onDatabaseReplaced()
+                            initializationAttempt++
+                            result.onSuccess {
+                                showBackupDialog = false
+                                snackbar.showSnackbar("Restore berhasil; database dan integritas SQLite telah diverifikasi.")
+                            }.onFailure {
+                                snackbar.showSnackbar(it.message ?: "Restore gagal; periksa status pemulihan database.")
+                            }
+                        }
+                    }
+                ) { Text("Pulihkan") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !backupBusy,
+                    onClick = { showRestoreConfirmation = false; restoreUri = null }
+                ) { Text("Batal") }
+            }
+        )
     }
 
     if (showWorkspaceDialog) {
@@ -853,7 +1006,7 @@ private fun TransactionsScreen(
         else -> null
     }
     val pagingTransactions = remember(
-        workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
+        repository, workspaceId, appliedSearchQuery, typeFilter, dateBounds, accountFilterId,
         categoryFilterId, minAmount, maxAmount, sortOrder, filterError
     ) {
         if (filterError != null) {
@@ -1492,7 +1645,7 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
                 "Gunakan ikon pengaturan pada header dashboard untuk menampilkan atau menyembunyikan tren arus kas, rekening, rencana, peringatan, jatuh tempo, dan aktivitas terbaru.",
                 AppTab.DASHBOARD, "Buka Ringkasan"),
             GuideEntry("Keamanan", "Penyimpanan offline dan cadangan",
-                "Data inti disimpan secara lokal dengan Room/SQLite. Backup dan restore database penuh terenkripsi belum tersedia. Ekspor CSV dapat menulis seluruh transaksi yang cocok, tetapi bukan pengganti backup database.",
+                "Data inti disimpan lokal dengan Room/SQLite. Backup database tersedia melalui menu Tambah dan menghasilkan arsip ZIP dengan checksum; arsip belum dienkripsi dan belum mencakup lampiran. CSV hanya mengekspor transaksi sesuai filter.",
                 AppTab.GUIDE, "Tetap di Panduan"),
             GuideEntry("Tutorial", "Langkah pertama mencatat transaksi",
                 "1) Pilih Tambah. 2) Tentukan pemasukan, pengeluaran, atau transfer. 3) Isi nominal, akun, kategori, tanggal, dan keterangan. 4) Tinjau kembali lalu simpan. Transfer hanya memindahkan saldo antar-akun, bukan pendapatan atau biaya.",
@@ -1598,11 +1751,15 @@ private fun GuideScreen(onNavigate: (AppTab) -> Unit) {
         )
         GuideCard(
             "Apakah ekspor CSV mencadangkan seluruh aplikasi?",
-            "Tidak. CSV menulis seluruh hasil transaksi yang cocok dengan filter aktif secara bertahap. Cadangan penuh yang mencakup database dan lampiran belum tersedia."
+            "Tidak. CSV mengekspor transaksi sesuai filter. Untuk database gunakan menu Tambah → Backup & restore database. Arsip belum dienkripsi dan tidak mencakup lampiran."
+        )
+        GuideCard(
+            "Bagaimana membuat backup dan memulihkan database?",
+            "Buka menu Tambah lalu pilih Backup & restore database. Buat backup untuk menyimpan database lokal Duit ke arsip ZIP berisi manifest dan checksum SHA-256. Untuk pemulihan, pilih arsip ZIP Duit dan konfirmasikan penggantian database aktif. Backup belum dienkripsi dan belum mencakup file lampiran; simpan arsip di lokasi tepercaya. CSV tetap hanya untuk ekspor transaksi sesuai filter."
         )
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
-            "Belum. Akuntansi double-entry, buku besar, rekonsiliasi, impor spreadsheet, ERP, inventaris, OCR, enkripsi database, multi-user, dan backup/restore masih menjadi pekerjaan lanjutan."
+            "Belum. Akuntansi double-entry, buku besar, rekonsiliasi, impor spreadsheet, ERP, inventaris, OCR, enkripsi database, multi-user, backup terjadwal, dan pemulihan selektif masih menjadi pekerjaan lanjutan."
         )
         GuideCard(
             "Mengapa transaksi dibatalkan, bukan dihapus?",
