@@ -4,15 +4,24 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **1.2.0**
+- Versi: **1.3.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
 - Kotlin: 2.3.21
 - Android Gradle Plugin: 8.13.2
 - Penyimpanan: Room di atas SQLite
-- Database Room: versi 4
+- Database Room: versi 5
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
+
+## Fitur baru versi 1.3.0 — jadwal transaksi berulang
+
+- Template transaksi berulang tersimpan pada Room per workspace untuk pemasukan, pengeluaran, dan transfer; berisi nominal, akun, kategori, catatan, frekuensi harian/mingguan/bulanan/tahunan, interval, serta tanggal jatuh tempo pertama.
+- Pengguna dapat menjeda/melanjutkan jadwal. Akun sumber/tujuan dan kategori divalidasi saat pembuatan maupun ketika transaksi dicatat.
+- Pencatatan jatuh tempo dilakukan secara eksplisit oleh pengguna, bukan posting otomatis di background. Satu pencatatan membuat transaksi riil dan memajukan jadwal dalam satu transaksi Room.
+- Compare-and-set pada tanggal jatuh tempo mencegah pencatatan ganda akibat ketukan cepat. Pembuatan, jeda, lanjut, dan occurrence dicatat pada audit log.
+- Perhitungan bulanan mempertahankan tanggal acuan: 31 Januari → akhir Februari → 31 Maret, tanpa drift.
+- Room v4→v5 menambah tabel template dan indeks secara non-destruktif; tabel transaksi lama dan rumus saldo tidak diubah.
 
 ## Penyempurnaan UI/UX versi 1.2.0
 
@@ -140,7 +149,7 @@ gradle :app:assembleDebug
 gradle :app:assembleRelease
 ```
 
-GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.2.0.apk**.
+GitHub Actions menjalankan unit test, build Release, dan mengunggah artefak bernama **Duit-1.3.0.apk**.
 
 ## Signing dan distribusi
 
