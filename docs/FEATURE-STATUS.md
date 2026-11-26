@@ -1,6 +1,15 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **1.4.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+Versi source saat ini: **1.5.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+
+## Pembaruan versi 1.5.0 — backup dan restore database penuh
+
+- Backup memakai transaksi Room untuk menghasilkan snapshot konsisten dan menyimpan seluruh tabel data aplikasi ke arsip ZIP `.duitbackup`.
+- Tabel yang dicakup: `workspaces`, `accounts`, `categories`, `transactions`, `budgets`, `savings_goals`, `assets`, `liabilities`, `receivables`, `audit_logs`, dan `recurring_templates`. Nilai bertipe SQLite dipertahankan apa adanya.
+- Restore membaca manifest dan skema arsip, menolak versi database atau struktur tabel/kolom yang tidak cocok, meminta konfirmasi UI, lalu menghapus dan mengisi ulang data dalam satu transaksi. Pemeriksaan foreign key dan CRC arsip dilakukan sebelum commit.
+- Database schema metadata Room dan tabel internal SQLite tidak diimpor; aplikasi tetap mengelola skema dan migrasinya sendiri.
+- File backup saat ini tidak dienkripsi dengan kata sandi. Backup antar-versi skema belum dimigrasikan otomatis; gunakan versi aplikasi yang kompatibel.
+- Tes unit baru memverifikasi metadata backup dan penolakan arsip non-Duit. Build CI harus tetap diverifikasi untuk versi ini.
 
 ## Pembaruan versi 1.4.0 — duplikasi transaksi
 
@@ -117,7 +126,7 @@ Versi source saat ini: **1.4.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 **Keparahan tinggi**
 - Ekspor CSV versi lama pernah terbatas 500 baris. Versi 1.1.0 mengganti ekspor itu menjadi penulisan bertahap seluruh hasil filter dan mengganti tampilan histori menjadi Paging 3.
-- Aplikasi belum memiliki backup/restore database penuh tervalidasi; ekspor CSV tetap bukan cadangan penuh.
+- Backup/restore database penuh tersedia sejak 1.5.0 melalui arsip .duitbackup. CSV tetap merupakan ekspor transaksi terfilter, bukan backup database.
 
 **Keparahan sedang**
 - UI sebelumnya memiliki satu layar orkestrasi besar, tema yang hanya mendefinisikan warna, transaksi tanpa detail, panduan statis, dan dashboard tanpa pilihan periode. Design tokens, reusable components, detail transaksi, pencarian panduan, serta filter periode kini ditambahkan.
@@ -125,7 +134,7 @@ Versi source saat ini: **1.4.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 **Keparahan yang masih terbuka**
 - Modul transaksi umum belum memiliki edit, hapus dengan koreksi, lampiran, dan impor. Duplikasi transaksi dasar tersedia sejak 1.4.0; template transaksi berulang tersedia sejak 1.3.0.
-- PIN/biometrik, penguncian aplikasi, enkripsi database, dan backup/restore penuh belum tersedia; penyamaran nominal hanya perlindungan tampilan.
+- PIN/biometrik, penguncian aplikasi, dan enkripsi database/arsip backup belum tersedia; backup .duitbackup belum memakai kata sandi. Penyamaran nominal hanya perlindungan tampilan.
 - Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
 - Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menangani orkestrasi data dan dialog; komponen header, navigasi, dashboard, grafik, dan tile transaksi kini dipindah ke DuitExperience.kt. Pemisahan alur use-case/state management lebih lanjut masih diperlukan.
 
