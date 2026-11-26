@@ -109,6 +109,10 @@ import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
 import com.surabi.duit.data.FinanceDatabase
+import com.surabi.duit.data.FinanceBackupManager
+import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.Restore
+import android.net.Uri
 import com.surabi.duit.data.FinanceAlertEngine
 import com.surabi.duit.data.FinanceAlertSeverity
 import com.surabi.duit.data.FinanceRepository
@@ -184,6 +188,25 @@ private fun DuitApp(
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
     var pendingCsvRequest by remember { mutableStateOf<TransactionExportRequest?>(null) }
+    var showBackupDialog by remember { mutableStateOf(false) }
+    var showRestoreConfirmation by remember { mutableStateOf(false) }
+    var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    var backupBusy by remember { mutableStateOf(false) }
+    val backupExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) scope.launch {
+            backupBusy = true
+            val result = withContext(Dispatchers.IO) { runCatching {
+                val out = context.contentResolver.openOutputStream(uri) ?: error("File tujuan tidak dapat dibuka.")
+                FinanceBackupManager.createBackup(context, FinanceDatabase.getInstance(context), out)
+            } }
+            backupBusy = false
+            result.onSuccess { snackbar.showSnackbar("Backup berhasil dibuat dan checksum SHA-256 valid.") }
+                .onFailure { snackbar.showSnackbar(it.message ?: "Backup gagal.") }
+        }
+    }
+    val backupImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) { restoreUri = uri; showRestoreConfirmation = true }
+    }
     val csvExportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri ->
@@ -307,6 +330,11 @@ private fun DuitApp(
                     text = { Text("Tambah") }
                 )
                 DropdownMenu(expanded = showQuickActions, onDismissRequest = { showQuickActions = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Backup & restore database") },
+                        leadingIcon = { Icon(Icons.Filled.Backup, contentDescription = null) },
+                        onClick = { showQuickActions = false; showBackupDialog = true }
+                    )
                     DropdownMenuItem(
                         text = { Text("Catat transaksi") },
                         leadingIcon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
@@ -446,6 +474,61 @@ private fun DuitApp(
                 }
             }
         }
+    }
+
+    if (showBackupDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!backupBusy) showBackupDialog = false },
+            title = { Text("Backup & restore database") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Backup mencakup seluruh workspace, akun, transaksi, anggaran, target, aset, kewajiban, jadwal transaksi, dan audit log.")
+                    Text("Arsip ZIP memiliki manifest dan checksum SHA-256. Data diproses lokal dan tidak dikirim ke server.")
+                    Text("Restore mengganti database aktif. Simpan backup terbaru sebelum memulihkan.")
+                    if (backupBusy) CircularProgressIndicator()
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(enabled = !backupBusy, onClick = {
+                        val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
+                        backupExportLauncher.launch("Duit-Database-Backup-$stamp.zip")
+                    }) { Icon(Icons.Filled.Backup, contentDescription = null); Text(" Buat backup") }
+                    TextButton(enabled = !backupBusy, onClick = {
+                        backupImportLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                    }) { Icon(Icons.Filled.Restore, contentDescription = null); Text(" Pilih file restore") }
+                    TextButton(onClick = { showBackupDialog = false }) { Text("Tutup") }
+                }
+            }
+        )
+    }
+    if (showRestoreConfirmation && restoreUri != null) {
+        AlertDialog(
+            onDismissRequest = { showRestoreConfirmation = false; restoreUri = null },
+            title = { Text("Pulihkan database?") },
+            text = { Text("Data lokal saat ini akan diganti. File diperiksa format, versi skema, integritas SQLite, dan checksum sebelum restore. Buat backup data saat ini terlebih dahulu.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val uri = restoreUri
+                    restoreUri = null
+                    showRestoreConfirmation = false
+                    if (uri != null) scope.launch {
+                        backupBusy = true
+                        val result = withContext(Dispatchers.IO) { runCatching {
+                            val input = context.contentResolver.openInputStream(uri) ?: error("File backup tidak dapat dibuka.")
+                            FinanceBackupManager.restoreBackup(context, FinanceDatabase.getInstance(context), input)
+                        } }
+                        backupBusy = false
+                        result.onSuccess {
+                            initializationAttempt++
+                            showBackupDialog = false
+                            snackbar.showSnackbar("Restore berhasil; database berhasil diverifikasi.")
+                        }.onFailure { snackbar.showSnackbar(it.message ?: "Restore gagal.") }
+                    }
+                }) { Text("Pulihkan") }
+            },
+            dismissButton = { TextButton(onClick = { showRestoreConfirmation = false; restoreUri = null }) { Text("Batal") } }
+        )
     }
 
     if (showWorkspaceDialog) {
