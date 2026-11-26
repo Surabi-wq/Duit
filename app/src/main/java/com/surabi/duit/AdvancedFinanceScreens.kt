@@ -59,6 +59,7 @@ import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.GoalOverviewRow
 import com.surabi.duit.data.LiabilityOverviewRow
+import com.surabi.duit.data.NetWorthCalculator
 import com.surabi.duit.data.ReceivableOverviewRow
 import java.text.NumberFormat
 import java.util.Locale
@@ -197,7 +198,11 @@ private fun GoalProgressCard(
     onContribute: () -> Unit,
     onWithdraw: () -> Unit
 ) {
-    val progress = (goal.savedMinor.toDouble() / goal.targetMinor.toDouble()).coerceIn(0.0, 1.0).toFloat()
+    val progress = if (goal.targetMinor > 0L) {
+        (goal.savedMinor.toDouble() / goal.targetMinor.toDouble()).coerceIn(0.0, 1.0).toFloat()
+    } else {
+        0f
+    }
     val remaining = (goal.targetMinor - goal.savedMinor).coerceAtLeast(0L)
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -322,7 +327,13 @@ fun WealthScreen(
     val assetTotal = assets.sumOf { it.currentValueMinor }
     val receivableTotal = receivables.sumOf { it.outstandingMinor }
     val debtTotal = liabilities.sumOf { it.outstandingMinor }
-    val netWorth = accountTotal + goalTotal + assetTotal + receivableTotal - debtTotal
+    val netWorth = NetWorthCalculator.calculate(
+        accountBalances = accounts.map { it.balanceMinor },
+        allocatedGoalFunds = goals.map { it.savedMinor },
+        nonCashAssets = assets.map { it.currentValueMinor },
+        receivables = receivables.map { it.outstandingMinor },
+        liabilities = liabilities.map { it.outstandingMinor }
+    )
 
     DuitResponsiveColumn(
         modifier = Modifier.background(Color(0xFFF3F7F4)).verticalScroll(rememberScrollState())
