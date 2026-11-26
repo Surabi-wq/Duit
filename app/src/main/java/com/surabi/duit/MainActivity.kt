@@ -117,6 +117,7 @@ import com.surabi.duit.data.LiabilityOverviewRow
 import com.surabi.duit.data.ReceivableOverviewRow
 import com.surabi.duit.data.TransactionEntity
 import com.surabi.duit.data.TransactionDateRange
+import com.surabi.duit.data.TransactionDuplicationPolicy
 import com.surabi.duit.data.TransactionExportRequest
 import com.surabi.duit.data.WorkspaceEntity
 import com.surabi.duit.ui.DuitTheme
@@ -216,6 +217,7 @@ private fun DuitApp(
     var initializationAttempt by remember { mutableIntStateOf(0) }
     var showWorkspaceDialog by remember { mutableStateOf(false) }
     var showTransactionDialog by remember { mutableStateOf(false) }
+    var duplicateTransaction by remember { mutableStateOf<TransactionEntity?>(null) }
     var showAccountDialog by remember { mutableStateOf(false) }
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showGoalDialog by remember { mutableStateOf(false) }
@@ -407,6 +409,10 @@ private fun DuitApp(
                     categories = categories,
                     onAdd = { showTransactionDialog = true },
                     onManageRecurring = { showRecurringTemplatesDialog = true },
+                    onDuplicate = { item ->
+                        duplicateTransaction = item
+                        showTransactionDialog = true
+                    },
                     onExport = { request ->
                         pendingCsvRequest = request
                         val fileStamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
@@ -469,14 +475,23 @@ private fun DuitApp(
         TransactionDialog(
             accounts = accounts,
             categories = categories,
-            onDismiss = { showTransactionDialog = false },
+            initialTransaction = duplicateTransaction,
+            onDismiss = {
+                showTransactionDialog = false
+                duplicateTransaction = null
+            },
             onSave = { type, amount, title, fromId, toId, categoryId, note ->
+                val wasDuplicate = duplicateTransaction != null
                 scope.launch {
                     runCatching {
                         repository.createTransaction(workspaceId, type, amount, title, fromId, toId, categoryId, note)
                     }.onSuccess {
                         showTransactionDialog = false
-                        snackbar.showSnackbar("Transaksi berhasil disimpan.")
+                        duplicateTransaction = null
+                        snackbar.showSnackbar(
+                            if (wasDuplicate) "Salinan transaksi berhasil disimpan sebagai entri baru."
+                            else "Transaksi berhasil disimpan."
+                        )
                     }.onFailure { snackbar.showSnackbar(it.message ?: "Transaksi gagal disimpan.") }
                 }
             }
@@ -798,6 +813,7 @@ private fun TransactionsScreen(
     categories: List<CategoryEntity>,
     onAdd: () -> Unit,
     onManageRecurring: () -> Unit,
+    onDuplicate: (TransactionEntity) -> Unit,
     onExport: (TransactionExportRequest) -> Unit,
     onVoid: (Long, String) -> Unit
 ) {
@@ -1157,6 +1173,10 @@ private fun TransactionsScreen(
             destinationName = item.toAccountId?.let { accountNames[it] },
             categoryName = item.categoryId?.let { categoryNames[it] },
             onDismiss = { selectedDetails = null },
+            onDuplicate = {
+                selectedDetails = null
+                onDuplicate(item)
+            },
             onVoid = {
                 selectedDetails = null
                 selectedToVoid = item
@@ -1276,6 +1296,7 @@ private fun TransactionDetailsDialog(
     destinationName: String?,
     categoryName: String?,
     onDismiss: () -> Unit,
+    onDuplicate: () -> Unit,
     onVoid: () -> Unit
 ) {
     val dateText = SimpleDateFormat("EEEE, dd MMMM yyyy • HH:mm", Locale("id", "ID")).format(Date(item.occurredAt))
@@ -1313,7 +1334,14 @@ private fun TransactionDetailsDialog(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Tutup") } },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (TransactionDuplicationPolicy.canDuplicate(item.type)) {
+                    TextButton(onClick = onDuplicate) { Text("Duplikasi") }
+                }
+                TextButton(onClick = onDismiss) { Text("Tutup") }
+            }
+        },
         dismissButton = {
             TextButton(onClick = onVoid) { Text("Batalkan transaksi", color = MaterialTheme.colorScheme.error) }
         }
@@ -1648,28 +1676,47 @@ private fun WorkspaceDialog(
 private fun TransactionDialog(
     accounts: List<AccountBalanceRow>,
     categories: List<CategoryEntity>,
+    initialTransaction: TransactionEntity?,
     onDismiss: () -> Unit,
     onSave: (String, Long, String, Long, Long?, Long?, String) -> Unit
 ) {
-    var type by remember { mutableStateOf("EXPENSE") }
-    var amountText by remember { mutableStateOf("") }
-    var title by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var fromId by remember(accounts) { mutableLongStateOf(accounts.firstOrNull()?.id ?: 0L) }
-    var toId by remember(accounts) { mutableLongStateOf(accounts.getOrNull(1)?.id ?: 0L) }
-    var categoryId by remember(categories, type) {
-        mutableLongStateOf(categories.firstOrNull { it.kind == type }?.id ?: 0L)
+    val initialType = initialTransaction?.type?.takeIf(TransactionDuplicationPolicy::canDuplicate) ?: "EXPENSE"
+    val defaultSourceId = initialTransaction?.fromAccountId?.takeIf { id -> accounts.any { it.id == id } }
+        ?: accounts.firstOrNull()?.id ?: 0L
+    val defaultTargetId = initialTransaction?.toAccountId?.takeIf { id ->
+        id != defaultSourceId && accounts.any { it.id == id }
+    } ?: accounts.firstOrNull { it.id != defaultSourceId }?.id ?: 0L
+    var type by remember(initialTransaction?.id) { mutableStateOf(initialType) }
+    var amountText by remember(initialTransaction?.id) {
+        mutableStateOf(initialTransaction?.amountMinor?.toString().orEmpty())
+    }
+    var title by remember(initialTransaction?.id) { mutableStateOf(initialTransaction?.title.orEmpty()) }
+    var note by remember(initialTransaction?.id) { mutableStateOf(initialTransaction?.note.orEmpty()) }
+    var fromId by remember(initialTransaction?.id, accounts) { mutableLongStateOf(defaultSourceId) }
+    var toId by remember(initialTransaction?.id, accounts) { mutableLongStateOf(defaultTargetId) }
+    var categoryId by remember(initialTransaction?.id, categories, type) {
+        mutableLongStateOf(
+            initialTransaction?.categoryId?.takeIf { id -> categories.any { it.id == id && it.kind == type } }
+                ?: categories.firstOrNull { it.kind == type }?.id ?: 0L
+        )
     }
     val visibleCategories = categories.filter { it.kind == type }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Catat transaksi") },
+        title = { Text(if (initialTransaction == null) "Catat transaksi" else "Duplikasi transaksi") },
         text = {
             Column(
                 Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (initialTransaction != null) {
+                    Text(
+                        "Disalin dari transaksi #${initialTransaction.id}. Tanggal baru mengikuti waktu saat disimpan; transaksi asli tidak diubah.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilterChip(selected = type == "EXPENSE", onClick = { type = "EXPENSE" }, label = { Text("Pengeluaran") })
                     FilterChip(selected = type == "INCOME", onClick = { type = "INCOME" }, label = { Text("Pemasukan") })
@@ -1745,7 +1792,7 @@ private fun TransactionDialog(
                         note
                     )
                 }
-            ) { Text("Simpan") }
+            ) { Text(if (initialTransaction == null) "Simpan" else "Simpan salinan") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
     )

@@ -4,7 +4,7 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 
 ## Versi source
 
-- Versi: **1.3.0**
+- Versi: **1.4.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -13,6 +13,13 @@ Duit adalah aplikasi Android native untuk pencatatan dan perencanaan keuangan lo
 - Penyimpanan: Room di atas SQLite
 - Database Room: versi 5
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
+
+## Fitur baru versi 1.4.0 — duplikasi transaksi
+
+- Detail transaksi menyediakan tindakan duplikasi untuk pemasukan, pengeluaran, dan transfer.
+- Form duplikasi memuat nominal, keterangan, catatan, akun sumber/tujuan, dan kategori yang masih valid pada workspace aktif.
+- Salinan disimpan sebagai transaksi baru melalui validasi dan audit trail yang sama seperti pencatatan biasa; tanggalnya menggunakan waktu saat disimpan.
+- Transaksi sumber tidak diedit, dihapus, atau ditimpa. Tidak ada perubahan skema Room maupun perhitungan saldo.
 
 ## Fitur baru versi 1.3.0 — jadwal transaksi berulang
 

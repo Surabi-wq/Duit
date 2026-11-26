@@ -1,6 +1,14 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **1.3.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+Versi source saat ini: **1.4.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+
+## Pembaruan versi 1.4.0 — duplikasi transaksi
+
+- Detail transaksi mendukung duplikasi untuk pemasukan, pengeluaran, dan transfer.
+- Form menyalin nominal, keterangan, catatan, akun, dan kategori yang masih valid pada workspace aktif; pengguna dapat meninjau atau mengubah data sebelum menyimpan.
+- Penyimpanan menggunakan `createTransaction` yang sama, sehingga validasi workspace, jenis transaksi, dan audit log tetap berlaku.
+- Salinan menjadi transaksi baru dengan waktu pencatatan saat ini. Transaksi asal tidak dimutasi.
+- Tidak ada perubahan skema Room, migrasi, rumus saldo, transfer, atau kekayaan bersih.
 
 ## Pembaruan versi 1.3.0 — jadwal transaksi berulang
 
@@ -65,7 +73,7 @@ Versi source saat ini: **1.3.0**. Repositori dikembangkan sebagai aplikasi Andro
 
 ### Database dan kualitas
 - Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
-- Database versi 4 dengan migrasi eksplisit versi 1→2, 2→3, dan 3→4 (indeks tambahan); tidak memakai destructive migration.
+- Database Room versi 5 dengan migrasi eksplisit versi 1→2→3→4→5; migrasi non-destruktif dan tanpa destructive migration.
 - Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, perubahan batas saldo minimum akun, dan pembatalan transaksi.
 - Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
 - CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, batas periode dashboard, validasi nominal batas saldo minimum, escaping/perlindungan formula CSV, kesetaraan keluaran ekspor streaming, dan konfigurasi cache paging.
@@ -116,7 +124,7 @@ Versi source saat ini: **1.3.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Tampilan aset, anggaran, target, dan navigasi sebelumnya kurang terstruktur. Halaman kini dipisah berdasarkan kategori dan menampilkan ringkasan/progres.
 
 **Keparahan yang masih terbuka**
-- Modul transaksi umum belum memiliki edit, hapus dengan koreksi, duplikasi/template, lampiran, dan impor.
+- Modul transaksi umum belum memiliki edit, hapus dengan koreksi, lampiran, dan impor. Duplikasi transaksi dasar tersedia sejak 1.4.0; template transaksi berulang tersedia sejak 1.3.0.
 - PIN/biometrik, penguncian aplikasi, enkripsi database, dan backup/restore penuh belum tersedia; penyamaran nominal hanya perlindungan tampilan.
 - Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
 - Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menangani orkestrasi data dan dialog; komponen header, navigasi, dashboard, grafik, dan tile transaksi kini dipindah ke DuitExperience.kt. Pemisahan alur use-case/state management lebih lanjut masih diperlukan.
