@@ -1765,7 +1765,7 @@ private fun GuideScreen(
         )
         GuideCard(
             "Apakah semua fitur enterprise sudah tersedia?",
-            "Belum. Akuntansi double-entry, buku besar, rekonsiliasi, impor spreadsheet, ERP, inventaris, OCR, enkripsi database, multi-user, dan backup/restore masih menjadi pekerjaan lanjutan."
+            "Belum. Backup/restore database penuh tersedia sejak versi 1.5.0, tetapi akuntansi double-entry, buku besar, rekonsiliasi, impor spreadsheet, ERP, inventaris, OCR, enkripsi database, dan multi-user masih menjadi pekerjaan lanjutan."
         )
         GuideCard(
             "Mengapa transaksi dibatalkan, bukan dihapus?",
