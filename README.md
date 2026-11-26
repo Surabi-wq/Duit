@@ -11,7 +11,7 @@ Dokumen acuan wajib: [Landasan Dasar Resmi Pengembangan Duit](docs/BASELINE-APPL
 
 ## Versi source
 
-- Versi: **1.5.0**
+- Versi: **1.6.0**
 - Package: `com.surabi.duit`
 - Minimum Android: API 23
 - Compile/target SDK: 36
@@ -21,7 +21,15 @@ Dokumen acuan wajib: [Landasan Dasar Resmi Pengembangan Duit](docs/BASELINE-APPL
 - Database Room: versi 5
 - Nilai uang IDR: integer Rupiah (`Long`), tanpa floating-point untuk penyimpanan nominal
 
-## Fitur baru versi 1.5.0 — backup dan restore database penuh
+## Fitur baru versi 1.6.0 — pengaturan akun dan transfer langsung
+
+- Setiap kartu dompet/rekening memiliki tindakan Pengaturan untuk mengubah nama akun, jenis akun (tunai, bank, tabungan, e-wallet, kartu kredit, investasi, lainnya), dan batas saldo minimum.
+- Saldo berjalan dan saldo awal ditampilkan sebagai informasi; saldo awal tidak dapat diedit dari pengaturan karena nilainya menjadi dasar historis saldo dan transaksi.
+- Setiap akun memiliki tindakan Transfer langsung dengan akun tersebut otomatis menjadi sumber. Pengguna memilih akun tujuan lain pada workspace yang sama, nominal, keterangan, dan catatan.
+- Transfer disimpan melalui alur transaksi TRANSFER yang sama, sehingga saldo sumber berkurang, saldo tujuan bertambah, tidak diklasifikasikan sebagai pemasukan/pengeluaran, dan tercatat pada audit log.
+- Validasi menolak tujuan kosong, ID akun yang tidak valid, dan transfer ke akun sumber sendiri. Tidak ada perubahan skema Room; database tetap versi 5.
+
+## Fitur versi 1.5.0 — backup dan restore database penuh
 
 - Backup menyimpan snapshot konsisten dari seluruh tabel data Room dalam arsip ZIP khusus berekstensi .duitbackup, dengan nilai SQLite tetap bertipe (integer, float, teks, blob, atau null).
 - Tercakup: workspace, akun, kategori, transaksi, anggaran, target tabungan, aset, utang, piutang, audit log, dan template transaksi berulang.

@@ -379,6 +379,19 @@ interface FinanceDao {
     suspend fun updateAccountMinimumBalance(accountId: Long, workspaceId: Long, minimumBalanceMinor: Long): Int
 
     @Query("""
+        UPDATE accounts
+        SET name = :name, type = :type, minimumBalanceMinor = :minimumBalanceMinor
+        WHERE id = :accountId AND workspaceId = :workspaceId
+    """)
+    suspend fun updateAccountSettings(
+        accountId: Long,
+        workspaceId: Long,
+        name: String,
+        type: String,
+        minimumBalanceMinor: Long
+    ): Int
+
+    @Query("""
         SELECT
             a.id AS id,
             a.workspaceId AS workspaceId,

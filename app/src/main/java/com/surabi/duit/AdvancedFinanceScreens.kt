@@ -308,7 +308,8 @@ fun WealthScreen(
     receivables: List<ReceivableOverviewRow>,
     liabilities: List<LiabilityOverviewRow>,
     onAddAccount: () -> Unit,
-    onSetAccountMinimumBalance: (AccountBalanceRow) -> Unit,
+    onEditAccount: (AccountBalanceRow) -> Unit,
+    onTransferAccount: (AccountBalanceRow) -> Unit,
     onAddAsset: () -> Unit,
     onAddReceivable: () -> Unit,
     onCollectReceivable: (ReceivableOverviewRow) -> Unit,
@@ -382,28 +383,30 @@ fun WealthScreen(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-                        Row(
-                            Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        Column(
+                            Modifier.fillMaxWidth().padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(9.dp)
                         ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(account.name, fontWeight = FontWeight.SemiBold)
-                                Text(account.type.replace('_', ' '), style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(
-                                    if (account.minimumBalanceMinor > 0L) "Batas minimum: ${financeRupiah(account.minimumBalanceMinor)}"
-                                    else "Peringatan saldo minimum tidak aktif",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (account.minimumBalanceMinor > 0L && account.balanceMinor < account.minimumBalanceMinor) {
-                                    Text("Saldo di bawah batas minimum", style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.error)
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(account.name, fontWeight = FontWeight.SemiBold)
+                                    Text(account.type.replace('_', ' '), style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        if (account.minimumBalanceMinor > 0L) "Batas minimum: " + financeRupiah(account.minimumBalanceMinor)
+                                        else "Peringatan saldo minimum tidak aktif",
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (account.minimumBalanceMinor > 0L && account.balanceMinor < account.minimumBalanceMinor) {
+                                        Text("Saldo di bawah batas minimum", style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.error)
+                                    }
                                 }
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
                                 Text(financeRupiah(account.balanceMinor), fontWeight = FontWeight.Bold)
-                                TextButton(onClick = { onSetAccountMinimumBalance(account) }) { Text("Atur batas") }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(enabled = accounts.size > 1, onClick = { onTransferAccount(account) }) { Text("Transfer") }
+                                TextButton(onClick = { onEditAccount(account) }) { Text("Pengaturan") }
                             }
                         }
                     }

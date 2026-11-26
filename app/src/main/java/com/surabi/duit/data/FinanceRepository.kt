@@ -227,13 +227,10 @@ class FinanceRepository(private val database: FinanceDatabase) {
         type: String,
         openingBalance: Long
     ): Long {
-        val cleanName = name.trim()
-        require(cleanName.isNotEmpty()) { "Nama akun wajib diisi." }
-        require(cleanName.length <= 60) { "Nama akun maksimal 60 karakter." }
+        val cleanName = AccountSettingsPolicy.normalizeName(name)
         require(openingBalance >= 0L) { "Saldo awal tidak boleh negatif. Catat saldo minus sebagai kewajiban." }
         require(dao.getWorkspace(workspaceId) != null) { "Workspace tidak ditemukan." }
-        val allowedTypes = setOf("CASH", "BANK", "SAVINGS", "EWALLET", "CREDIT_CARD", "INVESTMENT", "OTHER")
-        require(type in allowedTypes) { "Jenis akun tidak valid." }
+        AccountSettingsPolicy.requireSupportedType(type)
 
         return dao.insertAccount(
             AccountEntity(
@@ -244,6 +241,36 @@ class FinanceRepository(private val database: FinanceDatabase) {
                 createdAt = System.currentTimeMillis()
             )
         )
+    }
+
+    suspend fun updateAccountSettings(
+        workspaceId: Long,
+        accountId: Long,
+        name: String,
+        type: String,
+        minimumBalance: Long
+    ) {
+        val cleanName = AccountSettingsPolicy.normalizeName(name)
+        AccountSettingsPolicy.requireSupportedType(type)
+        AccountSettingsPolicy.requireValidMinimumBalance(minimumBalance)
+        val now = System.currentTimeMillis()
+        database.withTransaction {
+            val account = dao.getAccount(accountId, workspaceId)
+                ?: throw IllegalArgumentException("Akun tidak ditemukan pada workspace ini.")
+            check(dao.updateAccountSettings(accountId, workspaceId, cleanName, type, minimumBalance) == 1) {
+                "Pengaturan akun gagal diperbarui."
+            }
+            dao.insertAuditLog(
+                AuditLogEntity(
+                    workspaceId = workspaceId,
+                    entityType = "ACCOUNT",
+                    entityId = accountId,
+                    action = "ACCOUNT_SETTINGS_UPDATE",
+                    description = "Pengaturan akun " + account.name + " diperbarui: nama " + cleanName + ", jenis " + type + ", batas minimum " + minimumBalance + " rupiah.",
+                    createdAt = now
+                )
+            )
+        }
     }
 
     suspend fun setAccountMinimumBalance(workspaceId: Long, accountId: Long, minimumBalance: Long) {
@@ -288,9 +315,8 @@ class FinanceRepository(private val database: FinanceDatabase) {
             ?: throw IllegalArgumentException("Akun sumber tidak ditemukan pada workspace ini.")
 
         if (type == "TRANSFER") {
-            require(toAccountId != null) { "Akun tujuan transfer wajib dipilih." }
-            require(toAccountId != fromAccountId) { "Akun sumber dan tujuan harus berbeda." }
-            dao.getAccount(toAccountId, workspaceId)
+            AccountTransferPolicy.validateSelection(fromAccountId, toAccountId)
+            dao.getAccount(toAccountId!!, workspaceId)
                 ?: throw IllegalArgumentException("Akun tujuan tidak ditemukan pada workspace ini.")
             require(categoryId == null) { "Transfer tidak memakai kategori pemasukan/pengeluaran." }
         } else {
@@ -333,8 +359,8 @@ class FinanceRepository(private val database: FinanceDatabase) {
         val source = dao.getAccount(fromAccountId, workspaceId)
             ?: throw IllegalArgumentException("Akun sumber tidak ditemukan pada workspace ini.")
         if (type == "TRANSFER") {
-            require(toAccountId != null && toAccountId != source.id) { "Transfer harus memiliki akun tujuan yang berbeda." }
-            dao.getAccount(toAccountId, workspaceId)
+            AccountTransferPolicy.validateSelection(source.id, toAccountId)
+            dao.getAccount(toAccountId!!, workspaceId)
                 ?: throw IllegalArgumentException("Akun tujuan tidak ditemukan pada workspace ini.")
             require(categoryId == null) { "Transfer tidak memakai kategori." }
         } else {

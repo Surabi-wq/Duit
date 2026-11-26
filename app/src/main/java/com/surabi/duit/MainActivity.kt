@@ -106,7 +106,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.surabi.duit.data.AccountBalanceRow
-import com.surabi.duit.data.MinimumBalanceParser
 import com.surabi.duit.data.AssetEntity
 import com.surabi.duit.data.BudgetOverviewRow
 import com.surabi.duit.data.CategoryEntity
@@ -291,7 +290,8 @@ private fun DuitApp(
     var selectedLiabilityPayment by remember { mutableStateOf<LiabilityOverviewRow?>(null) }
     var selectedReceivableCollection by remember { mutableStateOf<ReceivableOverviewRow?>(null) }
     var selectedAssetForValue by remember { mutableStateOf<AssetEntity?>(null) }
-    var selectedAccountForMinimum by remember { mutableStateOf<AccountBalanceRow?>(null) }
+    var selectedAccountForSettings by remember { mutableStateOf<AccountBalanceRow?>(null) }
+    var selectedAccountForTransfer by remember { mutableStateOf<AccountBalanceRow?>(null) }
 
     // System back from a top-level destination returns to the dashboard instead of exiting the app.
     BackHandler(enabled = selectedTab != AppTab.DASHBOARD) {
@@ -502,7 +502,8 @@ private fun DuitApp(
                     receivables = receivables,
                     liabilities = liabilities,
                     onAddAccount = { showAccountDialog = true },
-                    onSetAccountMinimumBalance = { selectedAccountForMinimum = it },
+                    onEditAccount = { selectedAccountForSettings = it },
+                    onTransferAccount = { selectedAccountForTransfer = it },
                     onAddAsset = { showAssetDialog = true },
                     onAddReceivable = { showReceivableDialog = true },
                     onCollectReceivable = { selectedReceivableCollection = it },
@@ -809,25 +810,48 @@ private fun DuitApp(
         )
     }
 
-    selectedAccountForMinimum?.let { account ->
-        AccountMinimumBalanceDialog(
+    selectedAccountForSettings?.let { account ->
+        AccountSettingsDialog(
             account = account,
-            onDismiss = { selectedAccountForMinimum = null },
-            onSave = { minimumBalance ->
+            onDismiss = { selectedAccountForSettings = null },
+            onSave = { name, type, minimumBalance ->
                 scope.launch {
                     runCatching {
-                        repository.setAccountMinimumBalance(account.workspaceId, account.id, minimumBalance)
+                        repository.updateAccountSettings(account.workspaceId, account.id, name, type, minimumBalance)
                     }.onSuccess {
-                        selectedAccountForMinimum = null
-                        snackbar.showSnackbar(
-                            if (minimumBalance == 0L) {
-                                "Peringatan batas saldo minimum dinonaktifkan."
-                            } else {
-                                "Batas saldo minimum akun berhasil diperbarui."
-                            }
-                        )
+                        selectedAccountForSettings = null
+                        snackbar.showSnackbar("Pengaturan dompet/rekening berhasil diperbarui.")
                     }.onFailure {
-                        snackbar.showSnackbar(it.message ?: "Batas saldo minimum gagal diperbarui.")
+                        snackbar.showSnackbar(it.message ?: "Pengaturan akun gagal diperbarui.")
+                    }
+                }
+            }
+        )
+    }
+
+    selectedAccountForTransfer?.let { source ->
+        AccountTransferDialog(
+            source = source,
+            accounts = accounts,
+            onDismiss = { selectedAccountForTransfer = null },
+            onSave = { destinationId, amount, title, note ->
+                scope.launch {
+                    runCatching {
+                        repository.createTransaction(
+                            workspaceId = source.workspaceId,
+                            type = "TRANSFER",
+                            amount = amount,
+                            title = title,
+                            fromAccountId = source.id,
+                            toAccountId = destinationId,
+                            categoryId = null,
+                            note = note
+                        )
+                    }.onSuccess {
+                        selectedAccountForTransfer = null
+                        snackbar.showSnackbar("Transfer berhasil dicatat. Saldo kedua akun telah diperbarui.")
+                    }.onFailure {
+                        snackbar.showSnackbar(it.message ?: "Transfer gagal dicatat.")
                     }
                 }
             }
@@ -1962,50 +1986,102 @@ private fun TransactionDialog(
 }
 
 @Composable
-private fun AccountMinimumBalanceDialog(
+private fun AccountSettingsDialog(
     account: AccountBalanceRow,
     onDismiss: () -> Unit,
-    onSave: (Long) -> Unit
+    onSave: (String, String, Long) -> Unit
 ) {
-    var minimumText by remember(account.id, account.minimumBalanceMinor) {
-        mutableStateOf(account.minimumBalanceMinor.toString())
-    }
-    val parsedMinimum = MinimumBalanceParser.parse(minimumText)
-
+    var name by remember(account.id, account.name) { mutableStateOf(account.name) }
+    var type by remember(account.id, account.type) { mutableStateOf(account.type) }
+    var minimumText by remember(account.id, account.minimumBalanceMinor) { mutableStateOf(account.minimumBalanceMinor.toString()) }
+    val minimumBalance = minimumText.toLongOrNull()?.takeIf { it >= 0L }
+    val accountTypes = listOf(
+        "CASH" to "Dompet tunai", "BANK" to "Rekening bank", "SAVINGS" to "Tabungan",
+        "EWALLET" to "E-wallet", "CREDIT_CARD" to "Kartu kredit", "INVESTMENT" to "Investasi", "OTHER" to "Lainnya"
+    )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Batas saldo minimum") },
+        title = { Text("Pengaturan dompet/rekening") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Akun: ${account.name}", fontWeight = FontWeight.SemiBold)
-                Text("Saldo saat ini: ${formatRupiah(account.balanceMinor)}")
-                OutlinedTextField(
-                    value = minimumText,
-                    onValueChange = { minimumText = it.filter { char -> char in '0'..'9' } },
-                    label = { Text("Batas minimum (rupiah)") },
+            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(value = name, onValueChange = { name = it.take(61) },
+                    label = { Text("Nama akun") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                ChoiceDropdown(label = "Jenis akun", selected = type, options = accountTypes, onSelected = { type = it })
+                OutlinedTextField(value = minimumText,
+                    onValueChange = { minimumText = it.filter { char -> char.isDigit() } },
+                    label = { Text("Batas saldo minimum (rupiah)") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    "Peringatan muncul ketika saldo berada di bawah nilai ini. Isi 0 untuk menonaktifkan peringatan. Pengaturan ini tidak mengubah saldo atau transaksi.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (minimumText.isNotBlank() && parsedMinimum == null) {
-                    Text(
-                        "Nominal terlalu besar atau tidak valid.",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                Text("Saldo awal saat dibuat: " + formatRupiah(account.openingBalanceMinor) +
+                    ". Nilai ini dipertahankan agar riwayat saldo tidak berubah. Isi batas minimum 0 untuk menonaktifkan peringatan.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Saldo berjalan: " + formatRupiah(account.balanceMinor), fontWeight = FontWeight.SemiBold)
+                if (name.isBlank() || name.trim().length > 60) {
+                    Text("Nama akun wajib diisi dan maksimal 60 karakter.", color = MaterialTheme.colorScheme.error)
+                }
+                if (minimumBalance == null) {
+                    Text("Batas minimum harus berupa angka Rupiah yang valid.", color = MaterialTheme.colorScheme.error)
                 }
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = parsedMinimum != null,
-                onClick = { parsedMinimum?.let(onSave) }
-            ) { Text("Simpan") }
+            TextButton(enabled = name.isNotBlank() && name.trim().length <= 60 && minimumBalance != null,
+                onClick = { minimumBalance?.let { onSave(name, type, it) } }) { Text("Simpan pengaturan") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
+    )
+}
+
+@Composable
+private fun AccountTransferDialog(
+    source: AccountBalanceRow,
+    accounts: List<AccountBalanceRow>,
+    onDismiss: () -> Unit,
+    onSave: (destinationId: Long, amount: Long, title: String, note: String) -> Unit
+) {
+    val destinations = accounts.filter { it.id != source.id }
+    var destinationId by remember(source.id, destinations) { mutableLongStateOf(destinations.firstOrNull()?.id ?: 0L) }
+    var amountText by remember { mutableStateOf("") }
+    var title by remember(source.id) { mutableStateOf("Transfer antar akun") }
+    var note by remember { mutableStateOf("") }
+    val amount = amountText.toLongOrNull()?.takeIf { it > 0L }
+    val destination = destinations.firstOrNull { it.id == destinationId }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Transfer dari " + source.name) },
+        text = {
+            Column(Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Akun sumber", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(source.name, fontWeight = FontWeight.SemiBold)
+                Text("Saldo saat ini: " + formatRupiah(source.balanceMinor))
+                if (destinations.isEmpty()) {
+                    Text("Tambahkan dompet atau rekening lain pada workspace ini sebelum melakukan transfer.",
+                        color = MaterialTheme.colorScheme.error)
+                } else {
+                    IdDropdown(label = "Akun tujuan", selectedId = destinationId,
+                        options = destinations.map { it.id to (it.name + " • " + it.type.replace('_', ' ')) },
+                        onSelected = { destinationId = it })
+                    Text(destination?.let { "Saldo tujuan saat ini: " + formatRupiah(it.balanceMinor) } ?: "Pilih akun tujuan",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedTextField(value = amountText,
+                    onValueChange = { amountText = it.filter { char -> char.isDigit() } },
+                    label = { Text("Nominal transfer (rupiah)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = title, onValueChange = { title = it.take(100) },
+                    label = { Text("Keterangan transfer") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(value = note, onValueChange = { note = it.take(500) },
+                    label = { Text("Catatan (opsional)") }, minLines = 2, maxLines = 3, modifier = Modifier.fillMaxWidth())
+                Text("Transfer mengurangi saldo akun sumber dan menambah saldo akun tujuan. Transfer bukan pemasukan atau pengeluaran, dan tidak memakai kategori.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = destination != null && amount != null && title.isNotBlank(),
+                onClick = { amount?.let { onSave(destinationId, it, title, note) } }) { Text("Konfirmasi transfer") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Batal") } }
     )

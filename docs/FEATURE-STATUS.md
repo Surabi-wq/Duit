@@ -1,6 +1,15 @@
 # Status Implementasi Fitur Duit
 
-Versi source saat ini: **1.5.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+Versi source saat ini: **1.6.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+
+## Pembaruan versi 1.6.0 — pengaturan dompet/rekening dan transfer langsung
+
+- Kartu tiap akun menyediakan pengaturan nama, jenis akun, dan batas saldo minimum; saldo awal/berjalan ditampilkan tetapi tidak dapat diubah dalam dialog ini agar saldo historis tetap konsisten.
+- Setiap kartu akun dapat memulai transfer langsung dengan akun tersebut sebagai sumber dan akun aktif lain dalam workspace yang sama sebagai tujuan.
+- Transfer memakai transaksi bertipe `TRANSFER` yang sama dengan alur transaksi, sehingga mengurangi akun sumber dan menambah akun tujuan tanpa memengaruhi total pemasukan/pengeluaran.
+- Perubahan pengaturan akun dan transfer tercatat pada audit log. Validasi menolak akun tujuan kosong, akun tidak valid, dan transfer ke akun yang sama.
+- Tidak ada perubahan skema Room atau migrasi database; database tetap versi 5.
+- Tes unit memeriksa nama dan jenis akun, batas saldo minimum, serta aturan pilihan pasangan akun transfer.
 
 ## Pembaruan versi 1.5.0 — backup dan restore database penuh
 
@@ -43,7 +52,8 @@ Versi source saat ini: **1.5.0**. Repositori dikembangkan sebagai aplikasi Andro
 - Dashboard workspace dengan saldo akun, pemasukan/pengeluaran periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), grafik agregat bulanan enam bulan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
 - Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
 - Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
-- Batas saldo minimum dapat diatur per akun; nilai 0 menonaktifkan peringatan. Perubahan dibatasi pada akun di workspace yang sama dan dicatat pada audit log.
+- Pengaturan akun mencakup perubahan nama, jenis (tunai, bank, tabungan, e-wallet, kartu kredit, investasi, lainnya), dan batas saldo minimum. Saldo awal dilindungi agar histori tidak berubah; semua perubahan tercatat pada audit log.
+- Transfer langsung dapat dimulai dari setiap kartu akun; sumber dipilih otomatis, tujuan hanya akun lain pada workspace yang sama. Transfer tetap merupakan perpindahan internal, bukan pemasukan/pengeluaran.
 - Akun dapat berupa tunai, bank, tabungan, e-wallet, kartu kredit, investasi, atau lainnya.
 
 ### Transaksi dan kontrol data
