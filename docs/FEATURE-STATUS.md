@@ -1,0 +1,188 @@
+# Status Implementasi Fitur Duit
+
+Versi source saat ini: **1.6.0**. Repositori dikembangkan sebagai aplikasi Android lokal/offline. Database Room saat ini versi 5.
+
+## Pembaruan versi 1.6.0 — pengaturan dompet/rekening dan transfer langsung
+
+- Kartu tiap akun menyediakan pengaturan nama, jenis akun, dan batas saldo minimum; saldo awal/berjalan ditampilkan tetapi tidak dapat diubah dalam dialog ini agar saldo historis tetap konsisten.
+- Setiap kartu akun dapat memulai transfer langsung dengan akun tersebut sebagai sumber dan akun aktif lain dalam workspace yang sama sebagai tujuan.
+- Transfer memakai transaksi bertipe `TRANSFER` yang sama dengan alur transaksi, sehingga mengurangi akun sumber dan menambah akun tujuan tanpa memengaruhi total pemasukan/pengeluaran.
+- Perubahan pengaturan akun dan transfer tercatat pada audit log. Validasi menolak akun tujuan kosong, akun tidak valid, dan transfer ke akun yang sama.
+- Tidak ada perubahan skema Room atau migrasi database; database tetap versi 5.
+- Tes unit memeriksa nama dan jenis akun, batas saldo minimum, serta aturan pilihan pasangan akun transfer.
+
+## Pembaruan versi 1.5.0 — backup dan restore database penuh
+
+- Backup memakai transaksi Room untuk menghasilkan snapshot konsisten dan menyimpan seluruh tabel data aplikasi ke arsip ZIP `.duitbackup`.
+- Tabel yang dicakup: `workspaces`, `accounts`, `categories`, `transactions`, `budgets`, `savings_goals`, `assets`, `liabilities`, `receivables`, `audit_logs`, dan `recurring_templates`. Nilai bertipe SQLite dipertahankan apa adanya.
+- Restore membaca manifest dan skema arsip, menolak versi database atau struktur tabel/kolom yang tidak cocok, meminta konfirmasi UI, lalu menghapus dan mengisi ulang data dalam satu transaksi. Pemeriksaan foreign key dan CRC arsip dilakukan sebelum commit.
+- Database schema metadata Room dan tabel internal SQLite tidak diimpor; aplikasi tetap mengelola skema dan migrasinya sendiri.
+- File backup saat ini tidak dienkripsi dengan kata sandi. Backup antar-versi skema belum dimigrasikan otomatis; gunakan versi aplikasi yang kompatibel.
+- Tes unit baru memverifikasi metadata backup dan penolakan arsip non-Duit. Build CI harus tetap diverifikasi untuk versi ini.
+
+## Pembaruan versi 1.4.0 — duplikasi transaksi
+
+- Detail transaksi mendukung duplikasi untuk pemasukan, pengeluaran, dan transfer.
+- Form menyalin nominal, keterangan, catatan, akun, dan kategori yang masih valid pada workspace aktif; pengguna dapat meninjau atau mengubah data sebelum menyimpan.
+- Penyimpanan menggunakan `createTransaction` yang sama, sehingga validasi workspace, jenis transaksi, dan audit log tetap berlaku.
+- Salinan menjadi transaksi baru dengan waktu pencatatan saat ini. Transaksi asal tidak dimutasi.
+- Tidak ada perubahan skema Room, migrasi, rumus saldo, transfer, atau kekayaan bersih.
+
+## Pembaruan versi 1.3.0 — jadwal transaksi berulang
+
+- Template transaksi berulang tersimpan per workspace untuk pemasukan, pengeluaran, dan transfer; mencakup nominal, akun sumber/tujuan, kategori, catatan, cadence harian/mingguan/bulanan/tahunan, interval 1–36, dan tanggal jatuh tempo pertama.
+- Jadwal dapat dijeda/dilanjutkan. Pencatatan occurrence adalah tindakan eksplisit pengguna: repository membuat transaksi aktual dan memajukan due date secara atomik.
+- Validasi akun/kategori diulang saat pencatatan. Compare-and-set mencegah occurrence yang sama dicatat dua kali akibat ketukan cepat. Audit log mencatat pembuatan template, pause/resume, dan setiap occurrence.
+- Perhitungan kalender mempertahankan tanggal acuan serta akhir bulan (31 Jan → akhir Feb → 31 Mar) dan menangani tahun kabisat.
+- Room v4→v5 menambah `recurring_templates`, foreign key, dan indeks tanpa destructive migration atau perubahan pada histori transaksi lama.
+
+## Pembaruan versi 1.1.0 — histori, ekspor, privasi, dan dashboard
+
+- Histori transaksi menggunakan Room PagingSource + AndroidX Paging 3: 40 item per halaman, initial load 60, prefetch 20, dan cache maksimum 200 item. Loading, error, retry, dan empty state sudah ditangani di UI. Tidak memakai query riwayat yang di-limit 500 untuk tampilan.
+- Filter transaksi tetap mencakup teks, jenis, tanggal, akun, kategori, rentang nominal, dan pengurutan. Validasi workspace diterapkan pada akun/kategori filter.
+- Ekspor CSV mengeksekusi query filter yang sama dalam batch 200 baris dan menulis langsung ke Writer tujuan; tidak membangun seluruh file sebagai satu String. Semua hasil yang cocok diekspor tanpa batas 500 pada jalur streaming. Perlindungan formula spreadsheet dan UTF-8 BOM tetap dipertahankan.
+- Pengaturan widget dashboard persisten lokal: tren arus kas, dompet/rekening, anggaran/target, peringatan, jatuh tempo, aktivitas terbaru.
+- Penyembunyian nominal global persisten di preferensi lokal dan berlaku pada tampilan utama, riwayat, perencanaan, aset/kewajiban, serta teks peringatan dashboard. Ini hanya menyamarkan tampilan, bukan enkripsi atau kunci aplikasi.
+- Navigasi bawah menggunakan semantik tab dan status terpilih untuk pembaca layar.
+- Room v3→v4 menambahkan indeks gabungan (workspaceId, isVoided, occurredAt, id) untuk query histori. Migrasi aman tanpa destructive migration; rumus saldo, transfer, dana target, piutang, kewajiban, dan kekayaan bersih tidak diubah.
+
+## Sudah memiliki alur kerja nyata
+
+### Dashboard, workspace, dan akun
+- Dashboard workspace dengan saldo akun, pemasukan/pengeluaran periode terpilih (bulan ini, 30 hari terakhir, atau tahun ini), grafik agregat bulanan enam bulan, arus kas, anggaran, estimasi kekayaan bersih, dan peringatan keuangan berbasis aturan lokal.
+- Workspace terpisah untuk Pribadi, Keluarga, Bisnis, Perusahaan, Proyek, dan Lainnya.
+- Banyak akun/dompet per workspace, dengan saldo dihitung dari saldo awal dan histori transaksi.
+- Pengaturan akun mencakup perubahan nama, jenis (tunai, bank, tabungan, e-wallet, kartu kredit, investasi, lainnya), dan batas saldo minimum. Saldo awal dilindungi agar histori tidak berubah; semua perubahan tercatat pada audit log.
+- Transfer langsung dapat dimulai dari setiap kartu akun; sumber dipilih otomatis, tujuan hanya akun lain pada workspace yang sama. Transfer tetap merupakan perpindahan internal, bukan pemasukan/pengeluaran.
+- Akun dapat berupa tunai, bank, tabungan, e-wallet, kartu kredit, investasi, atau lainnya.
+
+### Transaksi dan kontrol data
+- Pemasukan, pengeluaran, dan transfer antar-akun.
+- Pencarian langsung di SQLite berdasarkan keterangan, catatan, kategori, dan jenis transaksi; histori di layar ditampilkan dengan Paging 3 secara bertahap.
+- Filter berdasarkan jenis, rentang tanggal inklusif, akun sumber/tujuan, kategori, nominal minimum/maksimum, dan pengurutan tanggal atau nominal.
+- Validasi rentang tanggal menolak tanggal kalender tidak valid, teks tambahan, dan rentang awal yang melebihi tanggal akhir.
+- Filter divalidasi pada repository dan query dijalankan pada database; pencarian tidak memuat seluruh histori transaksi ke memori.
+- Ekspor CSV dari filter aktif melalui Android Storage Access Framework; seluruh hasil ditulis streaming dalam batch 200 baris, UTF-8 dengan BOM, serta escaping formula spreadsheet pada field teks.
+- Pembatalan transaksi (void) dengan alasan yang tersimpan pada audit log; catatan transaksi tidak dihapus.
+- Validasi akun/kategori harus berasal dari workspace yang sama.
+- Semua insert yang terkait dilakukan dalam transaksi database Room.
+
+### Anggaran dan tujuan
+- Anggaran bulanan umum atau kategori pengeluaran.
+- Target tabungan dengan nilai tujuan, prioritas, dan tanggal target opsional yang disimpan ke database.
+- Setoran target mengurangi saldo akun yang dipilih; penarikan target menambahnya kembali.
+- Nilai target tersimpan berdasarkan transaksi setoran/penarikan, tidak disimpan sebagai angka yang dapat menyimpang dari histori.
+
+### Aset, piutang, dan kewajiban
+- Pencatatan aset non-tunai, kategori aset, harga perolehan, dan nilai terkini.
+- Pencatatan piutang/tagihan per workspace beserta pihak yang berutang, nominal awal, jatuh tempo opsional, dan catatan.
+- Penerimaan piutang sebagian atau penuh ke akun yang dipilih; validasi mencegah penerimaan melebihi sisa piutang.
+- Sisa piutang dihitung dari seluruh penerimaan yang belum dibatalkan; pembatalan penerimaan memulihkan saldo akun dan sisa tagihan.
+- Piutang yang belum tertagih ikut menambah estimasi kekayaan bersih, sedangkan pencatatan piutang tidak menambah saldo tunai/rekening.
+- Pembaruan nilai aset dengan catatan perubahan pada audit log.
+- Pencatatan utang dengan pemberi pinjaman, nominal awal, tanggal jatuh tempo opsional, dan catatan.
+- Pencairan pinjaman dapat dikreditkan ke satu akun saat utang dibuat; gunakan hanya bila saldo pencairan belum pernah dicatat.
+- Pembayaran utang mengurangi saldo akun dan sisa utang secara atomik.
+- Kekayaan bersih terdata = saldo akun + dana target + nilai aset non-tunai − sisa utang.
+
+### Peringatan keuangan dashboard
+- Mesin aturan lokal mengevaluasi saldo negatif, saldo di bawah batas minimum akun, realisasi anggaran (peringatan mulai 80% dan kritis saat terlampaui), arus kas negatif sesuai periode terpilih, serta utang/piutang yang sudah melewati jatuh tempo.
+- Peringatan dihitung dari data workspace aktif; tidak mengubah transaksi atau saldo.
+- Peringatan dibatasi pada lima item teratas agar dashboard tetap ringkas.
+
+### Database dan kualitas
+- Room/SQLite lokal, foreign key, index, serta operasi transaksi atomik.
+- Database Room versi 5 dengan migrasi eksplisit versi 1→2→3→4→5; migrasi non-destruktif dan tanpa destructive migration.
+- Audit log untuk penciptaan transaksi, target, aset, kewajiban, pembaruan nilai, perubahan batas saldo minimum akun, dan pembatalan transaksi.
+- Nilai IDR menggunakan Long (rupiah bulat) dan input nominal divalidasi tanpa konversi floating-point.
+- CI menjalankan unit test dan build APK Release. Unit test mencakup parsing nominal, aturan peringatan keuangan, batas periode dashboard, validasi nominal batas saldo minimum, escaping/perlindungan formula CSV, kesetaraan keluaran ekspor streaming, dan konfigurasi cache paging.
+
+
+## Peningkatan UI/UX yang sudah terhubung ke data — 0.8.0
+
+- Design system global dengan palet semantik, surface konsisten, dan shape 8/12/16/20/24 dp.
+- Header workspace, bottom navigation, dan tindakan cepat global.
+- Dashboard memakai query tanggal aktual dengan periode bulan ini, 30 hari terakhir, dan tahun berjalan.
+- Dashboard menampilkan rekening, kekayaan bersih terdata, arus kas, anggaran, target, peringatan, dan jatuh tempo dari database.
+- Daftar transaksi dikelompokkan per tanggal; baris dapat membuka detail transaksi dan catatan.
+- Perencanaan memiliki ringkasan total target/realisasi dan detail tanggal target/periode anggaran.
+- Modul aset dipisah dengan chip kategori; nilai aset dapat diperbarui, serta batas saldo minimum akun tetap dapat diatur.
+- Panduan pencarian topik dan pintasan navigasi ke halaman fitur.
+- Unit test tambahan memeriksa batas periode dashboard lokal dan akhir hari inklusif.
+- Tidak ada perubahan skema database atau rumus saldo/kekayaan bersih pada pembaruan UI ini.
+
+## Penyegaran visual UI/UX — 0.9.0
+
+- Palet hijau-biru dibuat lebih tegas dengan background abu-abu kebiruan yang sangat muda, surface putih, serta status merah/oranye/biru/hijau yang konsisten.
+- Tipografi diperkuat untuk judul, saldo, nilai metrik, dan label; komponen mengikuti radius 12–26 dp dan ritme spacing 4/8 dp.
+- Dashboard memiliki kartu saldo utama bergradasi, ringkasan kekayaan bersih, kartu pemasukan/pengeluaran beraksen, dan dua progress bar arus kas yang memakai nominal aktual pada periode terpilih.
+- Pemilih periode ditampilkan sebagai chip yang terlihat langsung; rincian akun memakai ikon, warna lembut, dan batas kartu yang konsisten.
+- Modul perencanaan dan kekayaan bersih menggunakan komponen hero yang sama; kartu target, anggaran, aset, piutang, utang, transaksi, dan empty state diperkuat dengan border/elevasi/tint.
+- Logo launcher dan identitas aplikasi disegarkan tanpa mengubah nama paket.
+- Tidak ada perubahan skema Room, query saldo, atau rumus kekayaan bersih. Tidak ada data dummy.
+- Grafik tren waktu dan pengaturan widget belum diimplementasikan karena membutuhkan query seri waktu serta preferensi persisten; tidak disimulasikan dengan data buatan.
+
+## Perombakan UI/UX struktural — 1.0.0
+
+- Header aplikasi dibuat sebagai brand/workspace bar tersendiri, dengan kontrol workspace berbentuk selector dan aksi tambah workspace.
+- Navigasi bawah menjadi bottom dock khusus lima modul dengan indikator aktif di bagian atas ikon dan permukaan menu terpilih.
+- Dashboard bukan lagi tumpukan komponen lama. Susunan baru berisi sapaan/tanggal, pemilih periode, hero saldo+kekayaan bersih, pemasukan/pengeluaran, grafik tren enam bulan, akses cepat, rekening, perencanaan, peringatan, jatuh tempo, dan aktivitas.
+- Grafik bulanan menggunakan agregasi SQL pada tabel transaksi yang difilter per workspace, periode enam bulan, dan isVoided=0. Hanya baris agregat bulan (maksimal enam) yang dikirim ke UI; tidak mengambil seluruh histori dan tidak menggunakan batas 200 transaksi pada daftar.
+- Tile transaksi dirombak dengan ikon jenis transaksi, nominal yang menonjol, akun, kategori, catatan, serta waktu. Query, pencarian, filter, detail, pembatalan/void, audit log, dan ekspor tetap mempertahankan alur sebelumnya.
+- Perencanaan dan aset diberi latar halaman khusus, banner finansial kontras tinggi, serta kartu progres yang menampilkan angka utama lebih jelas.
+- Versi 1.1.0 menambah indeks lewat migrasi Room 3→4; tidak mengubah saldo, transfer, rumus cashflow, atau formula kekayaan bersih. Query tren hanya agregasi baca.
+
+## Temuan audit UI/UX dan status penanganan
+
+**Keparahan tinggi**
+- Ekspor CSV versi lama pernah terbatas 500 baris. Versi 1.1.0 mengganti ekspor itu menjadi penulisan bertahap seluruh hasil filter dan mengganti tampilan histori menjadi Paging 3.
+- Backup/restore database penuh tersedia sejak 1.5.0 melalui arsip .duitbackup. CSV tetap merupakan ekspor transaksi terfilter, bukan backup database.
+
+**Keparahan sedang**
+- UI sebelumnya memiliki satu layar orkestrasi besar, tema yang hanya mendefinisikan warna, transaksi tanpa detail, panduan statis, dan dashboard tanpa pilihan periode. Design tokens, reusable components, detail transaksi, pencarian panduan, serta filter periode kini ditambahkan.
+- Tampilan aset, anggaran, target, dan navigasi sebelumnya kurang terstruktur. Halaman kini dipisah berdasarkan kategori dan menampilkan ringkasan/progres.
+
+**Keparahan yang masih terbuka**
+- Modul transaksi umum belum memiliki edit, hapus dengan koreksi, lampiran, dan impor. Duplikasi transaksi dasar tersedia sejak 1.4.0; template transaksi berulang tersedia sejak 1.3.0.
+- PIN/biometrik, penguncian aplikasi, dan enkripsi database/arsip backup belum tersedia; backup .duitbackup belum memakai kata sandi. Penyamaran nominal hanya perlindungan tampilan.
+- Belum ada pengujian visual/UI automation menyeluruh, pengujian aksesibilitas otomatis, uji font sistem maksimum, uji layar kecil/besar, dan uji instalasi pada perangkat Android fisik.
+- Modularisasi arsitektur UI lebih lanjut masih diperlukan; MainActivity masih menangani orkestrasi data dan dialog; komponen header, navigasi, dashboard, grafik, dan tile transaksi kini dipindah ke DuitExperience.kt. Pemisahan alur use-case/state management lebih lanjut masih diperlukan.
+
+## Aturan akuntansi penting pada versi 1.0.0
+1. Transfer antar-akun tidak mengubah pemasukan/pengeluaran.
+2. Setoran target mengurangi akun sumber, tetapi menjadi dana target; karena itu tidak dicatat sebagai biaya.
+3. Penarikan target menambah akun sumber dan mengurangi dana target; bukan pendapatan.
+4. Pembayaran pokok utang mengurangi akun dan kewajiban; bukan seluruhnya biaya.
+5. Pencairan pinjaman menambah akun dan kewajiban; bukan pendapatan.
+6. Nilai aset non-tunai tidak boleh mencakup rekening/dompet yang sudah dicatat pada akun. Hal ini mencegah penghitungan ganda.
+7. Untuk pinjaman yang saldonya sudah tercatat, jangan memilih akun penerima saat membuat data utang.
+8. Mencatat piutang/tagihan tidak otomatis menambah saldo akun; hanya penerimaan yang benar-benar diterima yang menambah akun.
+9. Penerimaan piutang mengurangi sisa piutang, bukan pendapatan baru di laporan kas; pendapatan penjualan awal belum dibuat otomatis oleh modul piutang dasar.
+
+## Belum tersedia — jangan dianggap aktif
+- Transfer transaksi lintas workspace dengan prosedur kontrol dan konsolidasi multi-workspace.
+- Edit/hapus piutang, pembagian satu piutang ke beberapa invoice, riwayat perubahan rinci, dan pengingat jatuh tempo piutang.
+- Edit transaksi umum, riwayat versi detail, dan reversal jurnal double-entry.
+- Rekonsiliasi rekening dan penyesuaian saldo formal.
+- Template dan jadwal transaksi berulang untuk pemasukan/pengeluaran/transfer tersedia sejak 1.3.0. Lampiran dokumen, posting otomatis background, transaksi massal, dan impor CSV/spreadsheet masih belum tersedia.
+- Ekspor PDF/Excel/DOCX dan laporan profesional.
+- Target dengan jadwal kontribusi otomatis dan notifikasi pengingat.
+- Penyusutan, jadwal pemeliharaan, penjualan/penghapusan aset melalui jurnal.
+- Integrasi piutang dengan invoice/penjualan kredit dan jurnal pendapatan; analisis umur piutang, bunga/denda terstruktur, jadwal cicilan otomatis, serta laporan penagihan lanjutan.
+- Chart of Accounts, jurnal double-entry, buku besar, neraca saldo, neraca, laba rugi, dan laporan perubahan ekuitas.
+- ERP: perusahaan/cabang/departemen/cost center/proyek terstruktur; penjualan, pembelian, invoice, pelanggan, pemasok, produk, persediaan, gudang, dan HPP.
+- Investasi dengan harga pasar otomatis, dividen, obligasi, dan portofolio.
+- Pajak, invoice/kwitansi profesional, arsip dokumen, ekspor PDF/Excel/DOCX, serta impor CSV/spreadsheet.
+- Perbandingan periode/workspace, analisis prediktif, rekomendasi cerdas, OCR, dan asisten bahasa sehari-hari. Grafik tren agregat enam bulan tersedia; grafik prediktif atau perbandingan multi-workspace belum tersedia.
+- Pengguna multi-peran, hak akses, approval berjenjang.
+- PIN/biometrik, enkripsi database, pengamanan lampiran, backup/restore terenkripsi beserta checksum.
+- Pengaturan lengkap, tema gelap, mode pemula/mahir, multi-mata uang.
+
+## Gerbang penerimaan
+- Alur UI berakhir dengan data tersimpan, bukan sekadar halaman tampilan.
+- Validasi input dan workspace diterapkan.
+- Perhitungan diperiksa dengan kasus normal, batas, dan kegagalan.
+- Tidak menghapus histori keuangan secara diam-diam.
+- Tes unit/database/UI sesuai risiko modul lulus.
+- Build Debug/Release lulus.
+- Instalasi, upgrade database, dan penggunaan offline perlu diuji pada perangkat Android fisik sebelum dinyatakan siap rilis publik.
