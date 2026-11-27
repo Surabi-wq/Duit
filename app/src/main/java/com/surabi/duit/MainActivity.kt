@@ -21,6 +21,7 @@ import androidx.compose.ui.res.painterResource
 import com.surabi.duit.data.DashboardPeriod
 import com.surabi.duit.data.DashboardPeriodResolver
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +55,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -150,7 +152,15 @@ class MainActivity : ComponentActivity() {
             var balancesVisible by remember {
                 mutableStateOf(displayPreferences.getBoolean("balances_visible", true))
             }
-            DuitTheme {
+            var themeMode by remember {
+                mutableStateOf(displayPreferences.getString("theme_mode", "system") ?: "system")
+            }
+            val darkTheme = when (themeMode) {
+                "dark" -> true
+                "light" -> false
+                else -> isSystemInDarkTheme()
+            }
+            DuitTheme(darkTheme = darkTheme) {
                 CompositionLocalProvider(LocalDuitBalancesVisible provides balancesVisible) {
                     DuitApp(
                         repository = repository,
@@ -159,6 +169,11 @@ class MainActivity : ComponentActivity() {
                         onBalancesVisibleChange = { visible ->
                             balancesVisible = visible
                             displayPreferences.edit().putBoolean("balances_visible", visible).apply()
+                        },
+                        themeMode = themeMode,
+                        onThemeModeChange = { mode ->
+                            themeMode = mode
+                            displayPreferences.edit().putString("theme_mode", mode).apply()
                         }
                     )
                 }
@@ -175,7 +190,8 @@ private enum class AppTab(
     TRANSACTIONS("Transaksi", Icons.Filled.ReceiptLong),
     BUDGETS("Rencana", Icons.Filled.PieChart),
     ACCOUNTS("Aset", Icons.Filled.AccountBalanceWallet),
-    GUIDE("Panduan", Icons.Filled.Info)
+    GUIDE("Panduan", Icons.Filled.Info),
+    SETTINGS("Pengaturan", Icons.Filled.Settings)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,7 +200,9 @@ private fun DuitApp(
     repository: FinanceRepository,
     database: FinanceDatabase,
     balancesVisible: Boolean,
-    onBalancesVisibleChange: (Boolean) -> Unit
+    onBalancesVisibleChange: (Boolean) -> Unit,
+    themeMode: String,
+    onThemeModeChange: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -518,6 +536,12 @@ private fun DuitApp(
                         backupDocumentLauncher.launch("Duit-Backup-$stamp.duitbackup")
                     },
                     onRestoreBackup = { restoreDocumentLauncher.launch(arrayOf("*/*")) }
+                )
+                AppTab.SETTINGS -> DuitSettingsScreen(
+                    themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange,
+                    balancesVisible = balancesVisible,
+                    onBalancesVisibleChange = onBalancesVisibleChange
                 )
                 }
             }
