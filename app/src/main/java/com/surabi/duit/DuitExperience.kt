@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -180,7 +181,8 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
         "Transaksi" to Icons.Filled.ReceiptLong,
         "Rencana" to Icons.Filled.PieChart,
         "Aset" to Icons.Filled.AccountBalanceWallet,
-        "Panduan" to Icons.Filled.Info
+        "Panduan" to Icons.Filled.Info,
+        "Setelan" to Icons.Filled.Settings
     )
     Surface(modifier = Modifier.navigationBarsPadding(), color = Color.White, shadowElevation = 16.dp, tonalElevation = 1.dp) {
         Row(
