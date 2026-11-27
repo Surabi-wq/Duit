@@ -25,6 +25,29 @@ data class WorkspaceEntity(
     val createdAt: Long
 )
 
+/**
+ * Explicit profile metadata for each legacy workspace. Financial rows remain scoped by
+ * workspaceId, so this migration adds profile semantics without rewriting transaction IDs.
+ */
+@Entity(
+    tableName = "profiles",
+    foreignKeys = [
+        ForeignKey(
+            entity = WorkspaceEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["workspaceId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["workspaceId"], unique = true), Index("profileType")]
+)
+data class ProfileEntity(
+    @PrimaryKey val workspaceId: Long,
+    val profileType: String,
+    val displayName: String,
+    val createdAt: Long
+)
+
 @Entity(
     tableName = "accounts",
     foreignKeys = [
@@ -362,6 +385,15 @@ interface FinanceDao {
 
     @Query("SELECT COUNT(*) FROM workspaces")
     suspend fun workspaceCount(): Int
+
+    @Query("SELECT * FROM profiles ORDER BY createdAt ASC, workspaceId ASC")
+    fun observeProfiles(): Flow<List<ProfileEntity>>
+
+    @Query("SELECT * FROM profiles WHERE workspaceId = :workspaceId LIMIT 1")
+    suspend fun getProfile(workspaceId: Long): ProfileEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertProfile(profile: ProfileEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertWorkspace(workspace: WorkspaceEntity): Long
@@ -795,9 +827,10 @@ interface FinanceDao {
         LiabilityEntity::class,
         ReceivableEntity::class,
         AuditLogEntity::class,
-        RecurringTemplateEntity::class
+        RecurringTemplateEntity::class,
+        ProfileEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -939,6 +972,43 @@ abstract class FinanceDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS profiles (
+                        workspaceId INTEGER NOT NULL PRIMARY KEY,
+                        profileType TEXT NOT NULL,
+                        displayName TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(workspaceId) REFERENCES workspaces(id)
+                            ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_profiles_workspaceId ON profiles(workspaceId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_profiles_profileType ON profiles(profileType)"
+                )
+                // Preserve every existing workspace as its own isolated profile.
+                database.execSQL("""
+                    INSERT INTO profiles (workspaceId, profileType, displayName, createdAt)
+                    SELECT id,
+                        CASE type
+                            WHEN 'PERSONAL' THEN 'PERSONAL'
+                            WHEN 'FAMILY' THEN 'FAMILY'
+                            WHEN 'BUSINESS' THEN 'BUSINESS'
+                            WHEN 'COMPANY' THEN 'BUSINESS'
+                            WHEN 'PROJECT' THEN 'PROJECT'
+                            ELSE 'CUSTOM'
+                        END,
+                        name,
+                        createdAt
+                    FROM workspaces
+                """.trimIndent())
+            }
+        }
+
         @Volatile
         private var INSTANCE: FinanceDatabase? = null
 
@@ -948,7 +1018,7 @@ abstract class FinanceDatabase : RoomDatabase() {
                     context.applicationContext,
                     FinanceDatabase::class.java,
                     "duit-local.db"
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { INSTANCE = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { INSTANCE = it }
             }
         }
     }

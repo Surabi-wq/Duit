@@ -12,6 +12,7 @@ class FinanceRepository(private val database: FinanceDatabase) {
     private val dao = database.financeDao()
 
     val workspaces: Flow<List<WorkspaceEntity>> = dao.observeWorkspaces()
+    val profiles: Flow<List<ProfileEntity>> = dao.observeProfiles()
 
     fun accounts(workspaceId: Long): Flow<List<AccountBalanceRow>> =
         dao.observeAccountBalances(workspaceId)
@@ -181,6 +182,14 @@ class FinanceRepository(private val database: FinanceDatabase) {
                 val workspaceId = dao.insertWorkspace(
                     WorkspaceEntity(name = "Pribadi", type = "PERSONAL", createdAt = now)
                 )
+                dao.insertProfile(
+                    ProfileEntity(
+                        workspaceId = workspaceId,
+                        profileType = ProfileTypePolicy.fromWorkspaceType("PERSONAL"),
+                        displayName = "Pribadi",
+                        createdAt = now
+                    )
+                )
                 dao.insertAccount(
                     AccountEntity(
                         workspaceId = workspaceId,
@@ -206,6 +215,14 @@ class FinanceRepository(private val database: FinanceDatabase) {
             val now = System.currentTimeMillis()
             val id = dao.insertWorkspace(
                 WorkspaceEntity(name = cleanName, type = type, createdAt = now)
+            )
+            dao.insertProfile(
+                ProfileEntity(
+                    workspaceId = id,
+                    profileType = ProfileTypePolicy.fromWorkspaceType(type),
+                    displayName = cleanName,
+                    createdAt = now
+                )
             )
             dao.insertAccount(
                 AccountEntity(

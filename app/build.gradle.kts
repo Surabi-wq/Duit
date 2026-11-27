@@ -11,8 +11,8 @@ android {
         applicationId = "com.surabi.duit"
         minSdk = 23
         targetSdk = 36
-        versionCode = 16
-        versionName = "1.6.0"
+        versionCode = 18
+        versionName = "1.8.0"
     }
     buildTypes {
         debug {

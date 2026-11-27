@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -96,11 +97,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val DuitInk = Color(0xFF172B25)
-private val DuitMuted = Color(0xFF65766F)
+private val DuitInk = Color(0xFF142B4A)
+private val DuitMuted = Color(0xFF667487)
 private val DuitCanvas = Color(0xFFF3F7F4)
 private val DuitGreen = Color(0xFF087C55)
-private val DuitBlue = Color(0xFF2767C7)
+private val DuitBlue = Color(0xFF284C78)
 private val DuitRed = Color(0xFFD34A50)
 private val DuitAmber = Color(0xFFE59A32)
 
@@ -123,7 +124,7 @@ internal fun DuitAppHeader(
         ) {
             Box(
                 Modifier.size(42.dp).clip(RoundedCornerShape(14.dp))
-                    .background(Brush.linearGradient(listOf(DuitGreen, Color(0xFF174F82)))),
+                    .background(Brush.linearGradient(listOf(Color(0xFF101B35), Color(0xFF233F62), Color(0xFF9A7838)))),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Filled.Wallet, contentDescription = "Logo Duit", tint = Color.White, modifier = Modifier.size(24.dp))
@@ -180,7 +181,8 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
         "Transaksi" to Icons.Filled.ReceiptLong,
         "Rencana" to Icons.Filled.PieChart,
         "Aset" to Icons.Filled.AccountBalanceWallet,
-        "Panduan" to Icons.Filled.Info
+        "Panduan" to Icons.Filled.Info,
+        "Setelan" to Icons.Filled.Settings
     )
     Surface(modifier = Modifier.navigationBarsPadding(), color = Color.White, shadowElevation = 16.dp, tonalElevation = 1.dp) {
         Row(
@@ -204,17 +206,17 @@ internal fun DuitBottomDock(selectedIndex: Int, onSelect: (Int) -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Box(Modifier.width(28.dp).height(3.dp)
-                        .background(if (isCurrent) DuitGreen else Color.Transparent, CircleShape))
+                        .background(if (isCurrent) Color(0xFF9A7838) else Color.Transparent, CircleShape))
                     Box(
                         Modifier.size(width = 45.dp, height = 29.dp)
-                            .background(if (isCurrent) Color(0xFFDFF4E8) else Color.Transparent, RoundedCornerShape(12.dp)),
+                            .background(if (isCurrent) Color(0xFFF3E9D4) else Color.Transparent, RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(item.second, contentDescription = item.first,
-                            tint = if (isCurrent) DuitGreen else Color(0xFF819087), modifier = Modifier.size(20.dp))
+                            tint = if (isCurrent) Color(0xFF9A7838) else Color(0xFF819087), modifier = Modifier.size(20.dp))
                     }
                     Text(item.first, style = MaterialTheme.typography.labelSmall,
-                        color = if (isCurrent) DuitGreen else Color(0xFF78877F),
+                        color = if (isCurrent) Color(0xFF806126) else Color(0xFF78877F),
                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium, maxLines = 1)
                 }
             }
@@ -467,7 +469,7 @@ internal fun DuitFeatureBanner(
 ) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF073F32), Color(0xFF087C55), Color(0xFF245F91))))
+            .background(Brush.linearGradient(listOf(Color(0xFF101B35), Color(0xFF233F62), Color(0xFF9A7838))))
     ) {
         Box(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp)
             .size(100.dp).background(Color.White.copy(alpha = 0.07f), CircleShape))
@@ -498,7 +500,7 @@ private fun DuitAccountHero(totalBalance: Long, netWorth: Long, accountCount: In
         elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Box(Modifier.fillMaxWidth().background(
-            Brush.linearGradient(listOf(Color(0xFF073F32), Color(0xFF087C55), Color(0xFF1C6892)))
+            Brush.linearGradient(listOf(Color(0xFF101B35), Color(0xFF233F62), Color(0xFF9A7838)))
         )) {
             Box(Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 16.dp).size(108.dp)
                 .background(Color.White.copy(alpha = 0.07f), CircleShape))
