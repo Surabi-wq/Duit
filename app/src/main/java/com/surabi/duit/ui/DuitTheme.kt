@@ -1,9 +1,11 @@
 package com.surabi.duit.ui
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -15,31 +17,58 @@ import androidx.compose.ui.unit.sp
 
 val LocalDuitBalancesVisible = compositionLocalOf { true }
 
-private val DuitColors = lightColorScheme(
-    primary = Color(0xFF087C55),
+private val DuitLightColors = lightColorScheme(
+    primary = Color(0xFF142B4A),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDDF8EA),
-    onPrimaryContainer = Color(0xFF064A32),
-    secondary = Color(0xFF2563C7),
+    primaryContainer = Color(0xFFE1E9F3),
+    onPrimaryContainer = Color(0xFF10243E),
+    secondary = Color(0xFF9A7838),
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFE2EDFF),
-    onSecondaryContainer = Color(0xFF153A70),
-    tertiary = Color(0xFFE28B21),
+    secondaryContainer = Color(0xFFF3E9D4),
+    onSecondaryContainer = Color(0xFF4D3915),
+    tertiary = Color(0xFF426B78),
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFFFECCC),
-    onTertiaryContainer = Color(0xFF59330A),
-    background = Color(0xFFF4F7FB),
-    onBackground = Color(0xFF15251F),
+    tertiaryContainer = Color(0xFFDCECEF),
+    onTertiaryContainer = Color(0xFF173B45),
+    background = Color(0xFFF5F6F8),
+    onBackground = Color(0xFF172333),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF15251F),
-    surfaceVariant = Color(0xFFEDF2F7),
-    onSurfaceVariant = Color(0xFF526274),
-    outline = Color(0xFF8997A8),
-    outlineVariant = Color(0xFFDCE4ED),
-    error = Color(0xFFD54448),
+    onSurface = Color(0xFF172333),
+    surfaceVariant = Color(0xFFEBEEF2),
+    onSurfaceVariant = Color(0xFF586575),
+    outline = Color(0xFF8793A1),
+    outlineVariant = Color(0xFFD9DEE5),
+    error = Color(0xFFB3261E),
     onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFFCE5E6),
-    onErrorContainer = Color(0xFF5F1118)
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B)
+)
+
+private val DuitDarkColors = darkColorScheme(
+    primary = Color(0xFFB9CBE4),
+    onPrimary = Color(0xFF1D3554),
+    primaryContainer = Color(0xFF304967),
+    onPrimaryContainer = Color(0xFFE0EAF8),
+    secondary = Color(0xFFE0C58D),
+    onSecondary = Color(0xFF3C2D12),
+    secondaryContainer = Color(0xFF594522),
+    onSecondaryContainer = Color(0xFFF5E8C9),
+    tertiary = Color(0xFFA9CDD5),
+    onTertiary = Color(0xFF17363E),
+    tertiaryContainer = Color(0xFF2C5059),
+    onTertiaryContainer = Color(0xFFC5E8EF),
+    background = Color(0xFF101720),
+    onBackground = Color(0xFFE5EAF0),
+    surface = Color(0xFF18222E),
+    onSurface = Color(0xFFE5EAF0),
+    surfaceVariant = Color(0xFF273341),
+    onSurfaceVariant = Color(0xFFBAC5D2),
+    outline = Color(0xFF8996A5),
+    outlineVariant = Color(0xFF3D4A59),
+    error = Color(0xFFF2B8B5),
+    onError = Color(0xFF601410),
+    errorContainer = Color(0xFF8C1D18),
+    onErrorContainer = Color(0xFFF9DEDC)
 )
 
 private val DuitShapes = Shapes(
@@ -51,23 +80,26 @@ private val DuitShapes = Shapes(
 )
 
 private val DuitTypography = Typography().copy(
-    headlineLarge = TextStyle(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold),
-    headlineMedium = TextStyle(fontSize = 27.sp, lineHeight = 33.sp, fontWeight = FontWeight.Bold),
-    headlineSmall = TextStyle(fontSize = 23.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold),
+    headlineLarge = TextStyle(fontSize = 30.sp, lineHeight = 36.sp, fontWeight = FontWeight.ExtraBold),
+    headlineMedium = TextStyle(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Bold),
+    headlineSmall = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
     titleLarge = TextStyle(fontSize = 19.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold),
     titleMedium = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 21.sp),
+    bodyLarge = TextStyle(fontSize = 15.sp, lineHeight = 22.sp),
+    bodyMedium = TextStyle(fontSize = 13.sp, lineHeight = 19.sp),
     bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 17.sp),
-    labelLarge = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
-    labelMedium = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
-    labelSmall = TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium)
+    labelLarge = TextStyle(fontSize = 13.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold),
+    labelMedium = TextStyle(fontSize = 11.sp, lineHeight = 15.sp, fontWeight = FontWeight.Medium),
+    labelSmall = TextStyle(fontSize = 10.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
 )
 
 @Composable
-fun DuitTheme(content: @Composable () -> Unit) {
+fun DuitTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit
+) {
     MaterialTheme(
-        colorScheme = DuitColors,
+        colorScheme = if (darkTheme) DuitDarkColors else DuitLightColors,
         typography = DuitTypography,
         shapes = DuitShapes,
         content = content
