@@ -26,7 +26,7 @@ import java.util.zip.ZipOutputStream
 object FinanceBackupManager {
     private const val FORMAT_NAME = "DUIT_FULL_BACKUP"
     private const val FORMAT_VERSION = 1
-    private const val DATABASE_VERSION = 5
+    private const val DATABASE_VERSION = 6
     private const val DATA_MAGIC = 0x44554954 // DUIT
     private const val MANIFEST_ENTRY = "manifest.properties"
     private const val DATA_ENTRY = "tables.bin"
@@ -162,9 +162,11 @@ object FinanceBackupManager {
                 validateManifest(properties)
 
                 val backupVersion = properties.getProperty("databaseVersion").toInt()
-                require(backupVersion == sql.version && backupVersion == DATABASE_VERSION) {
+                val supportedBackup = backupVersion == sql.version ||
+                    (backupVersion == 5 && sql.version == DATABASE_VERSION)
+                require(supportedBackup) {
                     "Backup memakai versi database $backupVersion, sedangkan aplikasi ini memakai ${sql.version}. " +
-                        "Gunakan versi aplikasi yang kompatibel."
+                        "Versi backup tersebut belum didukung."
                 }
 
                 val dataEntry = findEntry(zip, DATA_ENTRY)
@@ -192,7 +194,12 @@ object FinanceBackupManager {
 
                 // Compare all table and column names before clearing existing data.
                 val currentSchemas = applicationTables(sql).associateWith { tableColumns(sql, it) }
-                require(archivedSchemas.map { it.name }.toSet() == currentSchemas.keys) {
+                val expectedArchivedTables = if (backupVersion == 5 && sql.version == 6) {
+                    currentSchemas.keys - "profiles"
+                } else {
+                    currentSchemas.keys
+                }
+                require(archivedSchemas.map { it.name }.toSet() == expectedArchivedTables) {
                     "Struktur tabel backup tidak cocok dengan database aplikasi ini."
                 }
                 archivedSchemas.forEach { archived ->
@@ -240,6 +247,24 @@ object FinanceBackupManager {
                 }
 
                 require(data.read() == -1) { "Ada data tambahan yang tidak dikenal pada arsip backup." }
+                if (backupVersion == 5 && sql.version == 6) {
+                    // Upgrade legacy v5 backups by mapping every restored workspace to a profile.
+                    sql.execSQL("""
+                        INSERT INTO profiles (workspaceId, profileType, displayName, createdAt)
+                        SELECT id,
+                            CASE type
+                                WHEN 'PERSONAL' THEN 'PERSONAL'
+                                WHEN 'FAMILY' THEN 'FAMILY'
+                                WHEN 'BUSINESS' THEN 'BUSINESS'
+                                WHEN 'COMPANY' THEN 'BUSINESS'
+                                WHEN 'PROJECT' THEN 'PROJECT'
+                                ELSE 'CUSTOM'
+                            END,
+                            name,
+                            createdAt
+                        FROM workspaces
+                    """.trimIndent())
+                }
                 zip.closeEntry() // Forces ZIP CRC verification before the transaction can commit.
                 val foreignKeyViolations = sql.query("PRAGMA foreign_key_check").use { cursor ->
                     cursor.count
