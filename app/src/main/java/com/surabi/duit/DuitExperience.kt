@@ -469,7 +469,7 @@ internal fun DuitFeatureBanner(
 ) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFF073F32), Color(0xFF087C55), Color(0xFF245F91))))
+            .background(Brush.linearGradient(listOf(Color(0xFF101B35), Color(0xFF233F62), Color(0xFF9A7838))))
     ) {
         Box(Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp)
             .size(100.dp).background(Color.White.copy(alpha = 0.07f), CircleShape))
@@ -500,7 +500,7 @@ private fun DuitAccountHero(totalBalance: Long, netWorth: Long, accountCount: In
         elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
     ) {
         Box(Modifier.fillMaxWidth().background(
-            Brush.linearGradient(listOf(Color(0xFF073F32), Color(0xFF087C55), Color(0xFF1C6892)))
+            Brush.linearGradient(listOf(Color(0xFF101B35), Color(0xFF233F62), Color(0xFF9A7838)))
         )) {
             Box(Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 16.dp).size(108.dp)
                 .background(Color.White.copy(alpha = 0.07f), CircleShape))
